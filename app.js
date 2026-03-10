@@ -534,8 +534,9 @@ const App = {
         <div class="form-group mb-lg">
           <label>Capture Signed Document (optional)</label>
           <div style="display:flex; gap:8px;">
-            <label class="btn btn-outline btn-full" style="cursor:pointer; text-align:center; flex:1;">
-              <span class="material-icons-round">camera_alt</span> Take Photo
+            <label class="btn btn-outline btn-full" style="cursor:pointer; flex:1; justify-content:center; align-items:center; display:flex;">
+              <span class="material-icons-round" style="font-size:20px;">camera_alt</span>
+              <span style="line-height:1;">Take Photo</span>
               <input type="file" id="pod-photo" accept="image/*" capture="environment" style="display:none;" />
             </label>
           </div>
