@@ -6,24 +6,26 @@ const AdminScreens = {
   renderShell() {
     const s = App.state.currentScreen;
     const u = App.state.user;
-    const items = [
+    const navMap = [
       { id: 'admin-dashboard', icon: 'dashboard', label: 'Dashboard' },
       { id: 'admin-drivers', icon: 'people', label: 'Drivers' },
+      { id: 'admin-vehicles', icon: 'local_shipping', label: 'Vehicles' },
       { id: 'admin-timesheets', icon: 'schedule', label: 'Timesheets' },
       { id: 'admin-defects', icon: 'report_problem', label: 'Defects' },
       { id: 'admin-pods', icon: 'inventory', label: 'PODs' },
       { id: 'admin-instructions', icon: 'send', label: 'Send Instructions' },
       { id: 'admin-export', icon: 'download', label: 'Export Data' },
     ];
-    const screens = {
-      'admin-dashboard': this.renderDashboard(),
-      'admin-drivers': this.renderDrivers(),
-      'admin-timesheets': this.renderTimesheets(),
-      'admin-defects': this.renderDefects(),
-      'admin-pods': this.renderPods(),
-      'admin-instructions': this.renderInstructions(),
-      'admin-export': this.renderExport(),
-    };
+    let screenContent = '';
+    if (s === 'admin-dashboard') screenContent = this.renderDashboard();
+    else if (s === 'admin-drivers') screenContent = this.renderDrivers();
+    else if (s === 'admin-vehicles') screenContent = this.renderVehicles();
+    else if (s === 'admin-timesheets') screenContent = this.renderTimesheets();
+    else if (s === 'admin-defects') screenContent = this.renderDefects();
+    else if (s === 'admin-pods') screenContent = this.renderPods();
+    else if (s === 'admin-instructions') screenContent = this.renderInstructions();
+    else if (s === 'admin-export') screenContent = this.renderExport();
+
     return `
     <div class="admin-layout">
       <aside class="admin-sidebar">
@@ -32,7 +34,7 @@ const AdminScreens = {
           <p>Office Portal</p>
         </div>
         <nav class="sidebar-nav">
-          ${items.map(i => `
+          ${navMap.map(i => `
             <button class="sidebar-item ${s === i.id ? 'active' : ''}" data-screen="${i.id}">
               <span class="material-icons-round">${i.icon}</span>${i.label}
             </button>`).join('')}
@@ -56,10 +58,10 @@ const AdminScreens = {
           </div>
         </header>
         <main class="main-content">
-          <div class="screen">${screens[s] || ''}</div>
+          <div class="screen">${screenContent}</div>
         </main>
         <nav class="bottom-nav">
-          ${items.slice(0, 5).map(i => `
+          ${navMap.slice(0, 5).map(i => `
             <button class="nav-item ${s === i.id ? 'active' : ''}" data-screen="${i.id}">
               <span class="material-icons-round">${i.icon}</span>${i.label.substring(0, 6)}
             </button>`).join('')}
@@ -92,6 +94,12 @@ const AdminScreens = {
           App.showInstructionModal({ title: 'POD: ' + pod.recipient, type: 'info', message: `<img src="${pod.photo}" style="width:100%; border-radius:8px;">` });
         }
       });
+    });
+    // Vehicle management
+    document.getElementById('btn-show-add-vehicle')?.addEventListener('click', () => { document.getElementById('add-vehicle-form').classList.toggle('hidden'); });
+    document.getElementById('btn-add-vehicle')?.addEventListener('click', () => this.addVehicle());
+    document.querySelectorAll('[data-remove-vehicle]').forEach(btn => {
+      btn.addEventListener('click', (e) => { e.stopPropagation(); this.removeVehicle(btn.dataset.removeVehicle); });
     });
   },
 
@@ -178,7 +186,40 @@ const AdminScreens = {
             </div>
             <div style="display:flex;gap:4px">
               <button class="btn btn-outline btn-sm" data-reset-pin="${d.id}" title="Reset PIN"><span class="material-icons-round" style="font-size:16px">lock_reset</span></button>
-              <button class="btn btn-danger btn-sm" data-remove-driver="${d.id}" title="Remove Driver"><span class="material-icons-round" style="font-size:16px">delete</span></button>
+              <button class="btn btn-outline btn-sm" data-remove-driver="${d.id}" title="Remove Driver" style="color:var(--danger);border-color:rgba(255,23,68,0.2)"><span class="material-icons-round" style="font-size:16px">delete</span></button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+  },
+
+  // --- Vehicle Management ---
+  renderVehicles() {
+    return `
+      <h1 class="screen-title">Vehicle Management</h1>
+      <p class="screen-subtitle">Manage company fleet available to drivers</p>
+      <button class="btn btn-accent btn-full mb-lg" id="btn-show-add-vehicle"><span class="material-icons-round">add</span>Add New Vehicle</button>
+      <div id="add-vehicle-form" class="card hidden mb-lg">
+        <div class="card-header"><span class="card-title">New Vehicle</span></div>
+        <div class="form-row">
+          <div class="form-group"><label>Registration Plate</label><input type="text" class="form-input" id="new-vehicle-reg" placeholder="e.g. AB12 CDE" required /></div>
+          <div class="form-group"><label>Vehicle Type</label><input type="text" class="form-input" id="new-vehicle-type" placeholder="e.g. 44T Tractor Unit" required /></div>
+        </div>
+        <button class="btn btn-primary mt-md" id="btn-add-vehicle"><span class="material-icons-round">local_shipping</span>Add to Fleet</button>
+      </div>
+      <div class="list-card">
+        ${App.data.vehicles.map(v => {
+          return `<div class="list-item">
+            <div class="list-item-icon" style="background:var(--primary-glow);color:var(--primary)">
+              <span class="material-icons-round">local_shipping</span>
+            </div>
+            <div class="list-item-content">
+              <div class="list-item-title">${v.reg}</div>
+              <div class="list-item-subtitle">${v.type}</div>
+            </div>
+            <div style="display:flex;gap:4px">
+              <span class="badge badge-${v.status==='active'?'success':'warning'}">${v.status}</span>
+              <button class="btn btn-outline btn-sm ml-sm" data-remove-vehicle="${v.reg}" title="Remove Vehicle" style="color:var(--danger);border-color:rgba(255,23,68,0.2)"><span class="material-icons-round" style="font-size:16px">delete</span></button>
             </div>
           </div>`;
         }).join('')}
@@ -186,10 +227,10 @@ const AdminScreens = {
   },
 
   addDriver() {
-    const name = document.getElementById('new-driver-name').value.trim();
+    const nameStr = document.getElementById('new-driver-name').value.trim();
     const pin = document.getElementById('new-driver-pin').value.trim();
-    if (!name || pin.length !== 4) { App.toast('Enter a name and 4-digit PIN', 'error'); return; }
-    const driver = { id: Date.now(), name, pin, vehicle: null, role: 'driver' };
+    if (!nameStr || pin.length !== 4) { App.toast('Enter a name and 4-digit PIN', 'error'); return; }
+    const driver = { id: Date.now(), name: nameStr, pin, vehicle: null, role: 'driver' };
     App.data.drivers.push(driver);
     this.saveDrivers();
     App.toast(`${name} added as a driver!`, 'success');
@@ -218,8 +259,33 @@ const AdminScreens = {
     }
   },
 
+  addVehicle() {
+    const reg = document.getElementById('new-vehicle-reg').value.trim().toUpperCase();
+    const type = document.getElementById('new-vehicle-type').value.trim();
+    if (!reg || !type) { App.toast('Registration and Type are required', 'error'); return; }
+    if (App.data.vehicles.find(v => v.reg === reg)) { App.toast('Vehicle already exists!', 'error'); return; }
+    
+    App.data.vehicles.push({ reg, type, status: 'active' });
+    this.saveVehicles();
+    App.toast(`Vehicle ${reg} added to fleet!`, 'success');
+    App.render();
+  },
+
+  removeVehicle(reg) {
+    if (confirm(`Are you sure you want to remove ${reg} from the fleet?`)) {
+      App.data.vehicles = App.data.vehicles.filter(v => v.reg !== reg);
+      this.saveVehicles();
+      App.toast(`Vehicle ${reg} removed.`, 'success');
+      App.render();
+    }
+  },
+
   saveDrivers() {
-    localStorage.setItem('gmh_drivers', JSON.stringify(App.data.drivers));
+    App.saveData('drivers');
+  },
+
+  saveVehicles() {
+    App.saveData('vehicles');
   },
 
   // --- Timesheets View ---

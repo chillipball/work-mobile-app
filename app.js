@@ -63,7 +63,7 @@ const App = {
       this.state.user = JSON.parse(saved);
       this.state.currentScreen = this.state.user.role === 'admin' ? 'admin-dashboard' : 'dashboard';
     }
-    ['drivers','timesheets','defects','pods','instructions'].forEach(key => {
+    ['drivers','vehicles','timesheets','defects','pods','instructions'].forEach(key => {
       const d = localStorage.getItem('gmh_' + key);
       if (d) this.data[key] = JSON.parse(d);
     });
@@ -454,7 +454,13 @@ const App = {
       </div>
       <div class="card mb-lg">
         <div class="form-row">
-          <div class="form-group"><label>Tractor Unit</label><input type="text" class="form-input" id="wa-vehicle" value="${this.state.user?.vehicle||''}" placeholder="e.g. AB12 CDE" /></div>
+          <div class="form-group">
+            <label>Tractor Unit</label>
+            <input type="text" list="vehicle-list" class="form-input" id="wa-vehicle" value="${this.state.user?.vehicle||''}" placeholder="e.g. AB12 CDE" autocomplete="off" />
+            <datalist id="vehicle-list">
+              ${this.data.vehicles.map(v => `<option value="${v.reg}">${v.type}</option>`).join('')}
+            </datalist>
+          </div>
           <div class="form-group"><label>Trailer ID</label><input type="text" class="form-input" id="wa-trailer" value="${this.state.user?.trailer||''}" placeholder="e.g. TR-240" /></div>
         </div>
         <div class="form-group"><label>Odometer Reading</label><input type="number" class="form-input" id="wa-odometer" placeholder="e.g. 245891" inputmode="numeric" /></div>
