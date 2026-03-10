@@ -117,7 +117,7 @@ const AdminScreens = {
             </div>
             <div class="list-item-content">
               <div class="list-item-title">${d.name}</div>
-              <div class="list-item-subtitle">${d.vehicle || 'No vehicle'} · ${active ? 'On shift since ' + active.start : 'Off duty'}</div>
+              <div class="list-item-subtitle">Unit: ${d.vehicle || 'None'} ${d.trailer ? '· Trl: '+d.trailer : ''} · ${active ? 'On shift since ' + active.start : 'Off duty'}</div>
             </div>
             <span class="status-dot ${active ? 'active' : 'inactive'}"></span>
           </div>`;
@@ -132,7 +132,7 @@ const AdminScreens = {
               <span class="material-icons-round">report_problem</span>
             </div>
             <div class="list-item-content">
-              <div class="list-item-title">${d.category} — ${d.vehicle}</div>
+              <div class="list-item-title">${d.category} — ${d.vehicle} ${d.trailer ? '('+d.trailer+')' : ''}</div>
               <div class="list-item-subtitle">${driver?.name || 'Unknown'} · ${d.date}</div>
             </div>
             <span class="badge badge-${d.severity==='high'?'danger':'warning'}">${d.severity}</span>
@@ -165,7 +165,7 @@ const AdminScreens = {
             </div>
             <div class="list-item-content">
               <div class="list-item-title">${d.name}</div>
-              <div class="list-item-subtitle">PIN: ${d.pin} · Vehicle: ${d.vehicle||'None'} · Shifts: ${ts.length} · Hrs: ${App.formatTime(totalHrs)} · Defects: ${defs.length} · PODs: ${pods.length}</div>
+              <div class="list-item-subtitle">PIN: ${d.pin} · Unit: ${d.vehicle||'None'} ${d.trailer ? '· Trl: '+d.trailer : ''} · Shifts: ${ts.length} · Hrs: ${App.formatTime(totalHrs)} · Defects: ${defs.length} · PODs: ${pods.length}</div>
             </div>
             <div style="display:flex;gap:4px">
               <button class="btn btn-outline btn-sm" data-reset-pin="${d.id}" title="Reset PIN"><span class="material-icons-round" style="font-size:16px">lock_reset</span></button>

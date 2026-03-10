@@ -267,12 +267,13 @@ const App = {
         <div class="vehicle-card" style="cursor:pointer" data-action="nav" data-target="vehicle-link">
           <div class="reg-plate">${vehicle.reg}</div>
           <div class="vehicle-info">${vehicle.type} · <span class="status-dot active"></span> Active</div>
+          ${u.trailer ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);font-size:var(--text-sm);color:var(--text-secondary)"><span class="material-icons-round" style="font-size:16px;vertical-align:middle;margin-right:4px">rv_hookup</span>Trailer: <strong style="color:var(--text-main)">${u.trailer}</strong></div>` : ''}
         </div>
       ` : `
         <div class="card" style="cursor:pointer;border-left:3px solid var(--warning)" data-action="nav" data-target="vehicle-link">
           <div class="flex gap-md" style="align-items:center">
             <span class="material-icons-round text-warning">warning</span>
-            <div><strong>No Vehicle Linked</strong><p class="text-muted" style="font-size:var(--text-sm)">Tap to link your vehicle</p></div>
+            <div><strong>No Vehicle Linked</strong><p class="text-muted" style="font-size:var(--text-sm)">Tap to link your vehicle & trailer</p></div>
           </div>
         </div>
       `}
@@ -306,7 +307,8 @@ const App = {
       </div>
       <div class="card">
         <div class="card-header"><span class="card-title">Details</span></div>
-        <div class="list-item" style="padding:var(--space-sm) 0"><div class="list-item-content"><div class="list-item-subtitle">Vehicle</div><div class="list-item-title">${u.vehicle || 'Not linked'}</div></div></div>
+        <div class="list-item" style="padding:var(--space-sm) 0"><div class="list-item-content"><div class="list-item-subtitle">Linked Tractor</div><div class="list-item-title">${u.vehicle || 'Not linked'}</div></div></div>
+        <div class="list-item" style="padding:var(--space-sm) 0"><div class="list-item-content"><div class="list-item-subtitle">Linked Trailer</div><div class="list-item-title">${u.trailer || 'Not linked'}</div></div></div>
         <div class="list-item" style="padding:var(--space-sm) 0"><div class="list-item-content"><div class="list-item-subtitle">Total Shifts</div><div class="list-item-title">${ts.length}</div></div></div>
         <div class="list-item" style="padding:var(--space-sm) 0"><div class="list-item-content"><div class="list-item-subtitle">Total Hours</div><div class="list-item-title">${this.formatTime(totalHrs)}</div></div></div>
         <div class="list-item" style="padding:var(--space-sm) 0"><div class="list-item-content"><div class="list-item-subtitle">Defect Reports</div><div class="list-item-title">${this.getDriverData('defects').length}</div></div></div>
@@ -330,9 +332,19 @@ const App = {
   renderVehicleLink() {
     const u = this.state.user;
     return `
-      <h1 class="screen-title">Vehicle Link</h1>
-      <p class="screen-subtitle">Select the vehicle you're driving today</p>
-      ${u.vehicle ? `<div class="vehicle-card"><div class="reg-plate">${u.vehicle}</div><div class="vehicle-info">${this.data.vehicles.find(v=>v.reg===u.vehicle)?.type || ''}</div></div>` : ''}
+      <h1 class="screen-title">Vehicle & Trailer</h1>
+      <p class="screen-subtitle">Select your tractor unit and trailer for today</p>
+      
+      <div class="card mb-lg">
+        <label style="display:block;margin-bottom:8px;font-size:var(--text-sm);font-weight:500;color:var(--text-secondary)">Linked Trailer ID</label>
+        <div style="display:flex;gap:8px">
+          <input type="text" class="form-input" id="link-trailer-input" placeholder="e.g. TR-240" value="${u.trailer || ''}" style="margin-bottom:0;" />
+          <button class="btn btn-primary" id="btn-save-trailer" style="white-space:nowrap">Save Trailer</button>
+        </div>
+      </div>
+      
+      <div class="section-header"><span class="section-title">Select Tractor Unit</span></div>
+      ${u.vehicle ? `<div class="vehicle-card mb-md"><div class="reg-plate">${u.vehicle}</div><div class="vehicle-info">${this.data.vehicles.find(v=>v.reg===u.vehicle)?.type || ''}</div></div>` : ''}
       <div class="list-card">
         ${this.data.vehicles.filter(v=>v.status==='active').map(v => `
           <div class="list-item" data-action="link-vehicle" data-reg="${v.reg}">
@@ -418,7 +430,7 @@ const App = {
           <div class="flex-between">
             <div>
               <div class="card-title">${todayCheck.nilDefect ? '✅ Nil Defect' : `⚠️ ${defectItems.length} Defect${defectItems.length!==1?'s':''} Reported`}</div>
-              <div style="font-size:var(--text-sm);color:var(--text-secondary);margin-top:4px">${this.state.user.vehicle || 'No vehicle'} · Odometer: ${todayCheck.odometer || '—'}</div>
+              <div style="font-size:var(--text-sm);color:var(--text-secondary);margin-top:4px">Unit: ${todayCheck.vehicle || 'N/A'} ${todayCheck.trailer ? ' · Trailer: '+todayCheck.trailer : ''} · Odo: ${todayCheck.odometer || '—'}</div>
             </div>
             <span class="badge badge-${todayCheck.nilDefect?'success':'warning'}">${todayCheck.nilDefect?'passed':'defects'}</span>
           </div>
@@ -441,9 +453,10 @@ const App = {
       </div>
       <div class="card mb-lg">
         <div class="form-row">
-          <div class="form-group"><label>Vehicle</label><input type="text" class="form-input" id="wa-vehicle" value="${this.state.user?.vehicle||''}" readonly /></div>
-          <div class="form-group"><label>Odometer Reading</label><input type="number" class="form-input" id="wa-odometer" placeholder="e.g. 245891" inputmode="numeric" /></div>
+          <div class="form-group"><label>Tractor Unit</label><input type="text" class="form-input" id="wa-vehicle" value="${this.state.user?.vehicle||''}" readonly /></div>
+          <div class="form-group"><label>Trailer ID</label><input type="text" class="form-input" id="wa-trailer" value="${this.state.user?.trailer||''}" readonly /></div>
         </div>
+        <div class="form-group"><label>Odometer Reading</label><input type="number" class="form-input" id="wa-odometer" placeholder="e.g. 245891" inputmode="numeric" /></div>
       </div>
       <div class="section-header"><span class="section-title">Daily Check</span><span class="section-title" style="font-size:var(--text-xs)">✓ Tick if applicable</span></div>
       <div class="list-card mb-lg">
@@ -494,7 +507,7 @@ const App = {
               <span class="material-icons-round">${c.nilDefect?'check_circle':'report_problem'}</span>
             </div>
             <div class="list-item-content">
-              <div class="list-item-title">${c.date} — ${c.vehicle||'N/A'}</div>
+              <div class="list-item-title">${c.date} — Unit: ${c.vehicle||'N/A'} ${c.trailer ? '· Trl: '+c.trailer:''}</div>
               <div class="list-item-subtitle">${c.nilDefect ? 'Nil defect' : defCount + ' defect' + (defCount!==1?'s':'')} · Odo: ${c.odometer||'—'} · ${c.time}</div>
             </div>
             <span class="badge badge-${c.nilDefect?'success':'warning'}">${c.nilDefect?'pass':'defects'}</span>
@@ -594,6 +607,19 @@ const App = {
   bindScreenActions() {
     // Logout
     document.getElementById('btn-logout')?.addEventListener('click', () => this.logout());
+    
+    // Trailer Linking
+    document.getElementById('btn-save-trailer')?.addEventListener('click', () => {
+      const tr = document.getElementById('link-trailer-input').value.trim();
+      this.state.user.trailer = tr;
+      localStorage.setItem('gmh_user', JSON.stringify(this.state.user));
+      const di = this.data.drivers.findIndex(d => d.id === this.state.user.id);
+      if (di > -1) this.data.drivers[di].trailer = tr;
+      this.saveData('drivers');
+      this.toast(tr ? 'Trailer ' + tr + ' linked!' : 'Trailer unlinked', 'success');
+      this.render();
+    });
+
     // Walkaround Defect Logic
     document.querySelectorAll('.wa-check').forEach(cb => {
       cb.addEventListener('change', (e) => {
@@ -617,12 +643,13 @@ const App = {
     document.getElementById('btn-submit-walkaround')?.addEventListener('click', () => {
       const isNil = document.getElementById('wa-nil-defect').checked;
       const vehicle = document.getElementById('wa-vehicle').value;
+      const trailer = document.getElementById('wa-trailer').value;
       const odometer = document.getElementById('wa-odometer').value;
       const additional = document.getElementById('wa-additional').value;
       const reportedTo = document.getElementById('wa-reported-to').value;
       const signature = document.getElementById('wa-signature').value;
 
-      if (!vehicle || !signature) { this.toast('Vehicle and Signature are required', 'error'); return; }
+      if (!vehicle || !signature) { this.toast('Tractor Unit and Signature are required', 'error'); return; }
 
       const failedItems = [];
       let missingNotes = false;
@@ -638,7 +665,7 @@ const App = {
       if (missingNotes) { this.toast('Please describe all selected defects', 'error'); return; }
 
       const check = {
-        id: Date.now(), driverId: this.state.user.id, type: 'walkaround', vehicle,
+        id: Date.now(), driverId: this.state.user.id, type: 'walkaround', vehicle, trailer,
         date: this.todayStr(), time: new Date().toTimeString().slice(0,5),
         odometer, nilDefect: isNil, items: failedItems,
         additionalNotes: additional, reportedTo, signature,
