@@ -63,7 +63,7 @@ const App = {
       this.state.user = JSON.parse(saved);
       this.state.currentScreen = this.state.user.role === 'admin' ? 'admin-dashboard' : 'dashboard';
     }
-    ['timesheets','defects','pods','instructions'].forEach(key => {
+    ['drivers','timesheets','defects','pods','instructions'].forEach(key => {
       const d = localStorage.getItem('gmh_' + key);
       if (d) this.data[key] = JSON.parse(d);
     });

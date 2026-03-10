@@ -75,6 +75,15 @@ const AdminScreens = {
     document.getElementById('admin-logout')?.addEventListener('click', () => App.logout());
     document.getElementById('btn-send-instruction')?.addEventListener('click', () => this.sendInstruction());
     document.getElementById('btn-export-csv')?.addEventListener('click', () => this.exportCSV());
+    // Driver management
+    document.getElementById('btn-show-add-driver')?.addEventListener('click', () => document.getElementById('add-driver-form').classList.toggle('hidden'));
+    document.getElementById('btn-add-driver')?.addEventListener('click', () => this.addDriver());
+    document.querySelectorAll('[data-remove-driver]').forEach(btn => {
+      btn.addEventListener('click', (e) => { e.stopPropagation(); this.removeDriver(parseInt(btn.dataset.removeDriver)); });
+    });
+    document.querySelectorAll('[data-reset-pin]').forEach(btn => {
+      btn.addEventListener('click', (e) => { e.stopPropagation(); this.resetPin(parseInt(btn.dataset.resetPin)); });
+    });
   },
 
   // --- Admin Dashboard ---
@@ -136,7 +145,14 @@ const AdminScreens = {
   renderDrivers() {
     return `
       <h1 class="screen-title">Driver Management</h1>
-      <p class="screen-subtitle">View all driver profiles and activity</p>
+      <p class="screen-subtitle">Add, manage, and view driver profiles</p>
+      <button class="btn btn-accent btn-full mb-lg" id="btn-show-add-driver"><span class="material-icons-round">person_add</span>Add New Driver</button>
+      <div id="add-driver-form" class="card hidden mb-lg">
+        <div class="card-header"><span class="card-title">New Driver</span></div>
+        <div class="form-group"><label>Full Name</label><input type="text" class="form-input" id="new-driver-name" placeholder="e.g. Dave Williams" required /></div>
+        <div class="form-group"><label>PIN (4 digits)</label><input type="text" class="form-input" id="new-driver-pin" placeholder="e.g. 3456" maxlength="4" inputmode="numeric" value="${String(Math.floor(1000+Math.random()*9000))}"/></div>
+        <button class="btn btn-primary mt-md" id="btn-add-driver"><span class="material-icons-round">person_add</span>Create Driver Account</button>
+      </div>
       <div class="list-card">
         ${App.data.drivers.map(d => {
           const ts = App.data.timesheets.filter(t => t.driverId === d.id);
@@ -149,11 +165,52 @@ const AdminScreens = {
             </div>
             <div class="list-item-content">
               <div class="list-item-title">${d.name}</div>
-              <div class="list-item-subtitle">Vehicle: ${d.vehicle||'None'} · Shifts: ${ts.length} · Hours: ${App.formatTime(totalHrs)} · Defects: ${defs.length} · PODs: ${pods.length}</div>
+              <div class="list-item-subtitle">PIN: ${d.pin} · Vehicle: ${d.vehicle||'None'} · Shifts: ${ts.length} · Hrs: ${App.formatTime(totalHrs)} · Defects: ${defs.length} · PODs: ${pods.length}</div>
+            </div>
+            <div style="display:flex;gap:4px">
+              <button class="btn btn-outline btn-sm" data-reset-pin="${d.id}" title="Reset PIN"><span class="material-icons-round" style="font-size:16px">lock_reset</span></button>
+              <button class="btn btn-danger btn-sm" data-remove-driver="${d.id}" title="Remove Driver"><span class="material-icons-round" style="font-size:16px">delete</span></button>
             </div>
           </div>`;
         }).join('')}
       </div>`;
+  },
+
+  addDriver() {
+    const name = document.getElementById('new-driver-name').value.trim();
+    const pin = document.getElementById('new-driver-pin').value.trim();
+    if (!name || pin.length !== 4) { App.toast('Enter a name and 4-digit PIN', 'error'); return; }
+    const driver = { id: Date.now(), name, pin, vehicle: null, role: 'driver' };
+    App.data.drivers.push(driver);
+    this.saveDrivers();
+    App.toast(`${name} added as a driver!`, 'success');
+    App.render();
+  },
+
+  removeDriver(id) {
+    const driver = App.getDriver(id);
+    if (!driver) return;
+    if (!confirm(`Remove ${driver.name}? Their history will be kept.`)) return;
+    App.data.drivers = App.data.drivers.filter(d => d.id !== id);
+    this.saveDrivers();
+    App.toast(`${driver.name} removed`, 'info');
+    App.render();
+  },
+
+  resetPin(id) {
+    const driver = App.getDriver(id);
+    if (!driver) return;
+    const newPin = prompt(`Enter new 4-digit PIN for ${driver.name}:`, driver.pin);
+    if (newPin && newPin.length === 4) {
+      driver.pin = newPin;
+      this.saveDrivers();
+      App.toast(`PIN updated for ${driver.name}`, 'success');
+      App.render();
+    }
+  },
+
+  saveDrivers() {
+    localStorage.setItem('gmh_drivers', JSON.stringify(App.data.drivers));
   },
 
   // --- Timesheets View ---
