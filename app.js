@@ -384,31 +384,122 @@ const App = {
   // DEFECT REPORTS
   // ============================================================
   renderDefects() {
-    const defs = this.getDriverData('defects');
+    const checks = this.getDriverData('defects');
+    const todayCheck = checks.find(c => c.date === this.todayStr() && c.type === 'walkaround');
+    const items = [
+      { id: 1, label: 'Fuel/Oil/Water Leaks' },
+      { id: 2, label: 'Tyres & Wheel Nuts' },
+      { id: 3, label: 'Mirrors/Indicators/Horn' },
+      { id: 4, label: 'Wipers/Washers/Windscreen' },
+      { id: 5, label: 'Saloon Lighting' },
+      { id: 6, label: 'Saloon Floor Covering' },
+      { id: 7, label: 'Steering/Brakes' },
+      { id: 8, label: 'Heating & Ventilation' },
+      { id: 9, label: 'Doors & Exits' },
+      { id: 10, label: 'Brakes & Hoses' },
+      { id: 11, label: 'Body Interior & Exterior' },
+      { id: 12, label: 'Lights/Reflectors/Battery' },
+      { id: 13, label: 'First Aid Kit' },
+      { id: 14, label: 'Passenger Seat Belts' },
+      { id: 15, label: 'Glass' },
+      { id: 16, label: 'Fire Extinguisher' },
+      { id: 17, label: 'Emergency Exit Hammer' },
+      { id: 18, label: 'Excessive Engine Exhaust Smoke' },
+      { id: 19, label: 'Tachograph Unit' },
+      { id: 20, label: 'Speed Limiter' },
+      { id: 21, label: 'Speedometer' },
+    ];
+    if (todayCheck) {
+      const defectItems = todayCheck.items.filter(i => i.status === 'fail');
+      return `
+        <h1 class="screen-title">Daily Walkaround</h1>
+        <p class="screen-subtitle">Today's check completed at ${todayCheck.time}</p>
+        <div class="card" style="border-left:3px solid ${todayCheck.nilDefect?'var(--success)':'var(--warning)'}">
+          <div class="flex-between">
+            <div>
+              <div class="card-title">${todayCheck.nilDefect ? '✅ Nil Defect' : `⚠️ ${defectItems.length} Defect${defectItems.length!==1?'s':''} Reported`}</div>
+              <div style="font-size:var(--text-sm);color:var(--text-secondary);margin-top:4px">${this.state.user.vehicle || 'No vehicle'} · Odometer: ${todayCheck.odometer || '—'}</div>
+            </div>
+            <span class="badge badge-${todayCheck.nilDefect?'success':'warning'}">${todayCheck.nilDefect?'passed':'defects'}</span>
+          </div>
+          ${defectItems.length > 0 ? `<div class="divider"></div>${defectItems.map(di => `
+            <div style="padding:var(--space-sm) 0"><strong>${di.label}</strong><p style="color:var(--text-secondary);font-size:var(--text-sm)">${di.notes||'No details'}</p></div>
+          `).join('')}` : ''}
+          ${todayCheck.additionalNotes ? `<div class="divider"></div><p style="font-size:var(--text-sm);color:var(--text-secondary)"><strong>Notes:</strong> ${todayCheck.additionalNotes}</p>` : ''}
+          <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-md)">Signed: ${todayCheck.signature} · Reported to: ${todayCheck.reportedTo||'N/A'}</div>
+        </div>
+        ${this.renderCheckHistory(checks)}`;
+    }
     return `
-      <h1 class="screen-title">Defect Reports</h1>
-      <p class="screen-subtitle">Report vehicle defects</p>
-      <button class="btn btn-accent btn-full mb-lg" id="btn-new-defect"><span class="material-icons-round">add_circle</span>Report New Defect</button>
-      <div id="defect-form" class="card hidden mb-lg">
-        <div class="card-header"><span class="card-title">New Defect Report</span></div>
-        <div class="form-group"><label>Vehicle</label><input type="text" class="form-input" id="def-vehicle" value="${this.state.user?.vehicle||''}" readonly /></div>
-        <div class="form-group"><label>Category</label>
-          <select class="form-select" id="def-category"><option value="Tyres">Tyres</option><option value="Brakes">Brakes</option><option value="Lights">Lights</option><option value="Engine">Engine</option><option value="Body">Body Damage</option><option value="Suspension">Suspension</option><option value="Electrical">Electrical</option><option value="Other">Other</option></select>
+      <h1 class="screen-title">Daily Walkaround</h1>
+      <p class="screen-subtitle">15-minute pre-departure vehicle inspection</p>
+      <div class="card mb-lg" style="border-left:3px solid var(--accent)">
+        <div class="flex gap-md" style="align-items:center">
+          <span class="material-icons-round text-accent">info</span>
+          <p style="font-size:var(--text-sm);color:var(--text-secondary)">Complete all 22 checks before setting off. Tick items that <strong>have a defect</strong>. Leave unchecked if OK.</p>
         </div>
-        <div class="form-group"><label>Severity</label>
-          <select class="form-select" id="def-severity"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High — Requires Immediate Attention</option></select>
-        </div>
-        <div class="form-group"><label>Description</label><textarea class="form-input" id="def-desc" placeholder="Describe the defect in detail..."></textarea></div>
-        <button class="btn btn-primary mt-md" id="btn-submit-defect"><span class="material-icons-round">send</span>Submit Report</button>
       </div>
+      <div class="card mb-lg">
+        <div class="form-row">
+          <div class="form-group"><label>Vehicle</label><input type="text" class="form-input" id="wa-vehicle" value="${this.state.user?.vehicle||''}" readonly /></div>
+          <div class="form-group"><label>Odometer Reading</label><input type="number" class="form-input" id="wa-odometer" placeholder="e.g. 245891" inputmode="numeric" /></div>
+        </div>
+      </div>
+      <div class="section-header"><span class="section-title">Daily Check</span><span class="section-title" style="font-size:var(--text-xs)">✓ Tick if applicable</span></div>
+      <div class="list-card mb-lg">
+        ${items.map(item => `
+          <div class="list-item walkaround-item" id="wa-row-${item.id}" style="flex-wrap:wrap">
+            <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-muted);width:28px;flex-shrink:0">${item.id}.</span>
+            <div class="list-item-content" style="flex:1;min-width:150px"><div class="list-item-title" style="font-size:var(--text-sm)">${item.label}</div></div>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex-shrink:0">
+              <input type="checkbox" class="wa-check" data-id="${item.id}" style="width:22px;height:22px;accent-color:var(--danger);cursor:pointer" />
+              <span style="font-size:var(--text-xs);color:var(--text-muted)">Defect</span>
+            </label>
+            <div class="wa-notes-wrap hidden" data-notes-for="${item.id}" style="width:100%;margin-top:var(--space-sm);padding-left:36px">
+              <input type="text" class="form-input wa-notes" data-notes-id="${item.id}" placeholder="Describe the defect..." style="font-size:var(--text-sm)" />
+            </div>
+          </div>
+        `).join('')}
+        <div class="list-item" style="background:var(--success-bg)">
+          <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-muted);width:28px">22.</span>
+          <div class="list-item-content"><div class="list-item-title" style="font-size:var(--text-sm);color:var(--success)">NIL DEFECT</div></div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="wa-nil-defect" style="width:22px;height:22px;accent-color:var(--success);cursor:pointer" />
+            <span style="font-size:var(--text-xs);color:var(--success)">All OK</span>
+          </label>
+        </div>
+      </div>
+      <div class="card mb-lg">
+        <div class="card-header"><span class="card-title">Additional Information</span></div>
+        <div class="form-group"><label>Record any defects or irregular circumstances</label><textarea class="form-input" id="wa-additional" placeholder="Write 'None' if no defects..."></textarea></div>
+        <div class="form-row">
+          <div class="form-group"><label>Reported To</label><input type="text" class="form-input" id="wa-reported-to" placeholder="e.g. Office / Workshop" /></div>
+          <div class="form-group"><label>Driver's Signature</label><input type="text" class="form-input" id="wa-signature" placeholder="Type your full name" /></div>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-full mb-lg" id="btn-submit-walkaround"><span class="material-icons-round">check_circle</span>Submit Walkaround Check</button>
+      ${this.renderCheckHistory(checks)}`;
+  },
+
+  renderCheckHistory(checks) {
+    const past = checks.filter(c => c.type === 'walkaround').sort((a,b) => b.id - a.id);
+    if (past.length === 0) return '';
+    return `
+      <div class="section-header mt-lg"><span class="section-title">History</span></div>
       <div class="list-card">
-        ${defs.length === 0 ? '<div class="empty-state"><span class="material-icons-round">verified</span><h3>No defects reported</h3><p>All looking good!</p></div>' : ''}
-        ${defs.map(d => `
-          <div class="list-item">
-            <div class="list-item-icon" style="background:var(--${d.severity==='high'?'danger':d.severity==='medium'?'warning':'info'}-bg);color:var(--${d.severity==='high'?'danger':d.severity==='medium'?'warning':'info'})"><span class="material-icons-round">report_problem</span></div>
-            <div class="list-item-content"><div class="list-item-title">${d.category} — ${d.vehicle}</div><div class="list-item-subtitle">${d.date} · ${d.description}</div></div>
-            <span class="badge badge-${d.status==='resolved'?'success':'warning'}">${d.status}</span>
-          </div>`).join('')}
+        ${past.map(c => {
+          const defCount = c.items ? c.items.filter(i => i.status === 'fail').length : 0;
+          return `<div class="list-item">
+            <div class="list-item-icon" style="background:${c.nilDefect?'var(--success-bg)':'var(--warning-bg)'};color:${c.nilDefect?'var(--success)':'var(--warning)'}">
+              <span class="material-icons-round">${c.nilDefect?'check_circle':'report_problem'}</span>
+            </div>
+            <div class="list-item-content">
+              <div class="list-item-title">${c.date} — ${c.vehicle||'N/A'}</div>
+              <div class="list-item-subtitle">${c.nilDefect ? 'Nil defect' : defCount + ' defect' + (defCount!==1?'s':'')} · Odo: ${c.odometer||'—'} · ${c.time}</div>
+            </div>
+            <span class="badge badge-${c.nilDefect?'success':'warning'}">${c.nilDefect?'pass':'defects'}</span>
+          </div>`;
+        }).join('')}
       </div>`;
   },
 
@@ -503,11 +594,61 @@ const App = {
   bindScreenActions() {
     // Logout
     document.getElementById('btn-logout')?.addEventListener('click', () => this.logout());
-    // Defect form
-    document.getElementById('btn-new-defect')?.addEventListener('click', () => document.getElementById('defect-form').classList.toggle('hidden'));
-    document.getElementById('btn-submit-defect')?.addEventListener('click', () => {
-      const d = { id: Date.now(), driverId: this.state.user.id, vehicle: this.state.user.vehicle || 'N/A', date: this.todayStr(), category: document.getElementById('def-category').value, severity: document.getElementById('def-severity').value, description: document.getElementById('def-desc').value, status: 'reported' };
-      this.data.defects.push(d); this.saveData('defects'); this.toast('Defect report submitted!', 'success'); this.render();
+    // Walkaround Defect Logic
+    document.querySelectorAll('.wa-check').forEach(cb => {
+      cb.addEventListener('change', (e) => {
+        const id = e.target.dataset.id;
+        const notesWrap = document.querySelector(`[data-notes-for="${id}"]`);
+        if (e.target.checked) {
+          notesWrap.classList.remove('hidden');
+          document.getElementById('wa-nil-defect').checked = false;
+        } else {
+          notesWrap.classList.add('hidden');
+          notesWrap.querySelector('input').value = '';
+        }
+      });
+    });
+    document.getElementById('wa-nil-defect')?.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        document.querySelectorAll('.wa-check').forEach(cb => { cb.checked = false; });
+        document.querySelectorAll('.wa-notes-wrap').forEach(w => { w.classList.add('hidden'); w.querySelector('input').value = ''; });
+      }
+    });
+    document.getElementById('btn-submit-walkaround')?.addEventListener('click', () => {
+      const isNil = document.getElementById('wa-nil-defect').checked;
+      const vehicle = document.getElementById('wa-vehicle').value;
+      const odometer = document.getElementById('wa-odometer').value;
+      const additional = document.getElementById('wa-additional').value;
+      const reportedTo = document.getElementById('wa-reported-to').value;
+      const signature = document.getElementById('wa-signature').value;
+
+      if (!vehicle || !signature) { this.toast('Vehicle and Signature are required', 'error'); return; }
+
+      const failedItems = [];
+      let missingNotes = false;
+      document.querySelectorAll('.wa-check:checked').forEach(cb => {
+        const id = parseInt(cb.dataset.id);
+        const label = document.querySelector(`#wa-row-${id} .list-item-title`).textContent;
+        const notes = document.querySelector(`input[data-notes-id="${id}"]`).value.trim();
+        if (!notes) missingNotes = true;
+        failedItems.push({ id, label, status: 'fail', notes });
+      });
+
+      if (!isNil && failedItems.length === 0) { this.toast('Select defects or tick NIL DEFECT', 'error'); return; }
+      if (missingNotes) { this.toast('Please describe all selected defects', 'error'); return; }
+
+      const check = {
+        id: Date.now(), driverId: this.state.user.id, type: 'walkaround', vehicle,
+        date: this.todayStr(), time: new Date().toTimeString().slice(0,5),
+        odometer, nilDefect: isNil, items: failedItems,
+        additionalNotes: additional, reportedTo, signature,
+        status: isNil ? 'resolved' : 'reported' // For admin panel compatibility
+      };
+
+      this.data.defects.unshift(check);
+      this.saveData('defects');
+      this.toast('Walkaround check submitted!', 'success');
+      this.render();
     });
     // POD form
     document.getElementById('btn-new-pod')?.addEventListener('click', () => document.getElementById('pod-form').classList.toggle('hidden'));
@@ -524,6 +665,12 @@ const App = {
 
   // --- Timer Logic ---
   startShift() {
+    const todayCheck = this.getDriverData('defects').find(c => c.date === this.todayStr() && c.type === 'walkaround');
+    if (!todayCheck) {
+      this.toast('Please complete your daily walkaround check first', 'warning');
+      this.navigate('defects');
+      return;
+    }
     const ts = { id: Date.now(), driverId: this.state.user.id, date: this.todayStr(), start: new Date().toTimeString().slice(0,5), end: null, breaks: 0, mileage: 0, status: 'active' };
     this.data.timesheets.unshift(ts); this.saveData('timesheets');
     this.state.timerRunning = true; this.state.timerElapsed = 0; this.state.timerStart = Date.now();
