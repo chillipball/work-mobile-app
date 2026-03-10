@@ -242,11 +242,12 @@ const AdminScreens = {
   removeDriver(id) {
     const driver = App.getDriver(id);
     if (!driver) return;
-    if (!confirm(`Remove ${driver.name}? Their history will be kept.`)) return;
-    App.data.drivers = App.data.drivers.filter(d => d.id !== id);
-    this.saveDrivers();
-    App.toast(`${driver.name} removed`, 'info');
-    App.render();
+    App.confirm(`Remove ${driver.name}? Their history will be kept.`, () => {
+      App.data.drivers = App.data.drivers.filter(d => d.id !== id);
+      this.saveDrivers();
+      App.toast(`${driver.name} removed`, 'info');
+      App.render();
+    });
   },
 
   resetPin(id) {
@@ -274,12 +275,12 @@ const AdminScreens = {
   },
 
   removeVehicle(reg) {
-    if (confirm(`Are you sure you want to remove ${reg} from the fleet?`)) {
+    App.confirm(`Are you sure you want to remove ${reg} from the fleet?`, () => {
       App.data.vehicles = App.data.vehicles.filter(v => v.reg !== reg);
       this.saveVehicles();
       App.toast(`Vehicle ${reg} removed.`, 'success');
       App.render();
-    }
+    });
   },
 
   saveDrivers() {

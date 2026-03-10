@@ -649,6 +649,24 @@ const App = {
     overlay.addEventListener('click', (e) => { if (e.target === overlay) { overlay.remove(); this.render(); } });
   },
 
+  confirm(message, onConfirm) {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal" style="display:flex;flex-direction:column;gap:var(--space-md);text-align:center;">
+        <span class="material-icons-round text-warning" style="font-size:48px;margin:0 auto">warning</span>
+        <h3 style="margin:0;color:var(--text-main)">Confirm Action</h3>
+        <p style="color:var(--text-secondary);margin:0">${message}</p>
+        <div style="display:flex;gap:var(--space-md);margin-top:var(--space-md);">
+          <button class="btn btn-outline" style="flex:1" id="btn-confirm-cancel">Cancel</button>
+          <button class="btn btn-danger" style="flex:1" id="btn-confirm-ok">Yes, proceed</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#btn-confirm-cancel').addEventListener('click', () => overlay.remove());
+    overlay.querySelector('#btn-confirm-ok').addEventListener('click', () => { overlay.remove(); onConfirm(); });
+  },
+
   bindScreenActions() {
     // Logout
     document.getElementById('btn-logout')?.addEventListener('click', () => this.logout());
