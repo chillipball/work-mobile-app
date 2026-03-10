@@ -11,6 +11,7 @@ const AdminScreens = {
       { id: 'admin-drivers', icon: 'people', label: 'Drivers' },
       { id: 'admin-vehicles', icon: 'local_shipping', label: 'Vehicles' },
       { id: 'admin-timesheets', icon: 'schedule', label: 'Timesheets' },
+      { id: 'admin-summary', icon: 'assignment', label: 'Weekly Summary' },
       { id: 'admin-defects', icon: 'report_problem', label: 'Defects' },
       { id: 'admin-pods', icon: 'inventory', label: 'PODs' },
       { id: 'admin-instructions', icon: 'send', label: 'Send Instructions' },
@@ -21,6 +22,7 @@ const AdminScreens = {
     else if (s === 'admin-drivers') screenContent = this.renderDrivers();
     else if (s === 'admin-vehicles') screenContent = this.renderVehicles();
     else if (s === 'admin-timesheets') screenContent = this.renderTimesheets();
+    else if (s === 'admin-summary') screenContent = this.renderWeeklySummary();
     else if (s === 'admin-defects') screenContent = this.renderDefects();
     else if (s === 'admin-pods') screenContent = this.renderPods();
     else if (s === 'admin-instructions') screenContent = this.renderInstructions();
@@ -326,6 +328,130 @@ const AdminScreens = {
           </tbody>
         </table>
       </div>`;
+  },
+
+  // --- Weekly Summary View ---
+  renderWeeklySummary() {
+    return `
+      <h1 class="screen-title">Driver Weekly Summary</h1>
+      <p class="screen-subtitle">View daily breakdown for payroll and tracking</p>
+      
+      <div class="card mb-lg">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Select Driver</label>
+            <select class="form-select" id="summary-driver" onchange="AdminScreens.updateSummaryView()">
+              <option value="">-- Choose a driver --</option>
+              ${App.data.drivers.map(d => `<option value="${d.id}">${d.name}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Week Commencing (Monday)</label>
+            <select class="form-select" id="summary-week" onchange="AdminScreens.updateSummaryView()">
+              ${this.getRecentWeeksOptions()}
+            </select>
+          </div>
+        </div>
+      </div>
+      
+      <div id="summary-results">
+        <div class="empty-state"><span class="material-icons-round">assignment</span><h3>Select a driver</h3><p>Choose a driver and week to view the summary.</p></div>
+      </div>
+    `;
+  },
+
+  getRecentWeeksOptions() {
+    let html = '';
+    const now = new Date();
+    for(let i=0; i<6; i++) {
+        let n = new Date();
+        n.setDate(n.getDate() - (n.getDay()||7) + 1 - (i*7));
+        const dateStr = n.toISOString().split('T')[0];
+        const displayStr = n.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
+        html += '<option value="' + dateStr + '">W/C ' + displayStr + '</option>';
+    }
+    return html;
+  },
+
+  updateSummaryView() {
+    const dSelect = document.getElementById('summary-driver');
+    const wSelect = document.getElementById('summary-week');
+    if(!dSelect || !wSelect) return;
+    
+    const driverId = parseInt(dSelect.value);
+    const wcDateStr = wSelect.value;
+    const resDiv = document.getElementById('summary-results');
+    
+    if(!driverId || isNaN(driverId)) {
+      resDiv.innerHTML = '<div class="empty-state"><span class="material-icons-round">assignment</span><h3>Select a driver</h3><p>Choose a driver and week to view the summary.</p></div>';
+      return;
+    }
+    
+    let totalHrs = 0; let totalMins = 0; let totalMiles = 0; let totalPods = 0; let totalNightOuts = 0;
+    const daysHtml = [];
+    const wcDate = new Date(wcDateStr);
+    
+    for(let i=0; i<7; i++) {
+        const d = new Date(wcDate);
+        d.setDate(d.getDate() + i);
+        const dateStr = d.toISOString().split('T')[0];
+        
+        const ts = App.data.timesheets.find(t => t.driverId === driverId && t.date === dateStr);
+        const pods = App.data.pods.filter(p => p.driverId === driverId && p.date === dateStr);
+        
+        let tsHtml = '<div class="text-muted" style="font-size:var(--text-sm)">No shift logged</div>';
+        if (ts) {
+            let durationStr = 'Ongoing';
+            if (ts.start && ts.end) {
+                const [sh,sm] = ts.start.split(':').map(Number);
+                const [eh,em] = ts.end.split(':').map(Number);
+                let mins = (eh*60+em) - (sh*60+sm);
+                if (mins < 0) mins += 24*60;
+                totalHrs += Math.floor(mins/60); totalMins += mins%60;
+                durationStr = Math.floor(mins/60) + 'h ' + (mins%60) + 'm (Breaks: ' + ts.breaks + 'm)';
+            }
+            if(ts.mileage) totalMiles += ts.mileage;
+            if(ts.nightOut) totalNightOuts++;
+            
+            tsHtml = '<div style="font-size:var(--text-sm); line-height:1.4;">' +
+                     '<strong>' + ts.start + ' - ' + (ts.end||'—') + '</strong> &nbsp;&bull;&nbsp; ' + durationStr + '<br>' +
+                     'Distance: ' + ts.mileage + 'mi<br>' +
+                     (ts.dieselAdded ? '<span class="text-muted">Fuel: ' + ts.dieselAdded + 'L Diesel (Odo: ' + ts.dieselMileage + ')</span><br>' : '') +
+                     (ts.adBlueAdded ? '<span class="text-muted">AdBlue: ' + ts.adBlueAdded + 'L (Odo: ' + ts.adBlueMileage + ')</span><br>' : '') +
+                     (ts.nightOut ? '<strong style="color:var(--accent)">Night Out: ' + ts.nightOutLocation + '</strong>' : '') +
+                     '</div>';
+        }
+        
+        let podsHtml = '';
+        if (pods.length > 0) {
+            totalPods += pods.length;
+            podsHtml = '<div style="font-size:var(--text-sm); line-height:1.4; margin-top:8px; padding-top:8px; border-top:1px dashed rgba(255,255,255,0.1)">' +
+                       '<strong>' + pods.length + ' Deliveries:</strong><br>' +
+                       pods.map(p => '&bull; ' + p.recipient + ' (' + p.location + ')').join('<br>') +
+                       '</div>';
+        }
+        
+        daysHtml.push('<div class="list-item" style="align-items:flex-start;">' +
+            '<div class="list-item-icon" style="background:var(--primary-glow);color:var(--primary);flex-shrink:0;">' +
+                '<div style="font-size:12px;font-weight:700;line-height:1;text-align:center;">' +
+                    d.toLocaleDateString('en-GB',{weekday:'short'}).toUpperCase() + '<br>' +
+                    '<span style="font-size:18px">' + d.getDate() + '</span>' +
+                '</div>' +
+            '</div>' +
+            '<div class="list-item-content" style="width:100%">' + tsHtml + podsHtml + '</div>' +
+        '</div>');
+    }
+    
+    totalHrs += Math.floor(totalMins / 60);
+    totalMins = totalMins % 60;
+    
+    resDiv.innerHTML = '<div class="stats-row" style="grid-template-columns: repeat(4, 1fr); gap: 12px; overflow-x: auto;">' +
+        '<div class="stat-card" style="padding:12px;"><div class="stat-value text-accent" style="font-size:18px;">' + totalHrs + 'h ' + totalMins + 'm</div><div class="stat-label">Total Time</div></div>' +
+        '<div class="stat-card" style="padding:12px;"><div class="stat-value text-info" style="font-size:18px;">' + totalMiles + '</div><div class="stat-label">Total Miles</div></div>' +
+        '<div class="stat-card" style="padding:12px;"><div class="stat-value text-success" style="font-size:18px;">' + totalPods + '</div><div class="stat-label">Deliveries</div></div>' +
+        '<div class="stat-card" style="padding:12px;"><div class="stat-value text-warning" style="font-size:18px;">' + totalNightOuts + '</div><div class="stat-label">Night Outs</div></div>' +
+        '</div>' +
+        '<div class="list-card mt-md">' + daysHtml.join('') + '</div>';
   },
 
   // --- Defects View ---
