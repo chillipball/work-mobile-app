@@ -32,9 +32,9 @@ const App = {
       { reg: 'HJ69 XYZ', type: '80T Crane-Mounted Unit', status: 'active' },
     ],
     timesheets: [
-      { id: 1, driverId: 1, date: '2026-03-10', start: '06:00', end: '14:30', breaks: 45, mileage: 187, status: 'submitted' },
-      { id: 2, driverId: 1, date: '2026-03-09', start: '05:30', end: '15:00', breaks: 60, mileage: 234, status: 'approved' },
-      { id: 3, driverId: 2, date: '2026-03-10', start: '07:00', end: null, breaks: 30, mileage: 0, status: 'active' },
+      { id: 1, driverId: 1, date: '2026-03-10', start: '06:00', end: '14:30', breaks: 45, mileage: 187, dieselAdded: 200, dieselMileage: 120000, adBlueAdded: 20, adBlueMileage: 120000, nightOut: false, nightOutLocation: '', status: 'submitted' },
+      { id: 2, driverId: 1, date: '2026-03-09', start: '05:30', end: '15:00', breaks: 60, mileage: 234, dieselAdded: 0, dieselMileage: 0, adBlueAdded: 0, adBlueMileage: 0, nightOut: true, nightOutLocation: 'M1 South Mimms Services', status: 'approved' },
+      { id: 3, driverId: 2, date: '2026-03-10', start: '07:00', end: null, breaks: 30, mileage: 0, dieselAdded: 0, dieselMileage: 0, adBlueAdded: 0, adBlueMileage: 0, nightOut: false, nightOutLocation: '', status: 'active' },
     ],
     defects: [
       { id: 1, driverId: 1, vehicle: 'DX73 HRT', date: '2026-03-09', category: 'Tyres', severity: 'medium', description: 'Nearside front tyre worn close to limit', status: 'reported' },
@@ -379,15 +379,41 @@ const App = {
           ${!this.state.timerRunning && active ? `<button class="btn btn-success" id="btn-resume"><span class="material-icons-round">play_arrow</span>Resume</button><button class="btn btn-danger" id="btn-end-shift"><span class="material-icons-round">stop</span>End Shift</button>` : ''}
         </div>
       </div>
-      <div class="form-group mt-lg"><label>Mileage</label><input type="number" class="form-input" id="ts-mileage" placeholder="Enter today's mileage" /></div>
+      <div class="card mb-lg">
+        <div class="form-group"><label>End of Shift Mileage</label><input type="number" class="form-input" id="ts-mileage" placeholder="Total distance driven today" inputmode="numeric" /></div>
+        <div class="divider"></div>
+        <div class="form-row">
+          <div class="form-group"><label>Diesel Added (L)</label><input type="number" class="form-input" id="ts-diesel" placeholder="e.g. 200" inputmode="numeric" /></div>
+          <div class="form-group"><label>Odo at Refuel</label><input type="number" class="form-input" id="ts-diesel-odo" placeholder="Odometer" inputmode="numeric" /></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>AdBlue Added (L)</label><input type="number" class="form-input" id="ts-adblue" placeholder="e.g. 25" inputmode="numeric" /></div>
+          <div class="form-group"><label>Odo at Refuel</label><input type="number" class="form-input" id="ts-adblue-odo" placeholder="Odometer" inputmode="numeric" /></div>
+        </div>
+        <div class="divider"></div>
+        <label style="display:flex;align-items:center;gap:12px;cursor:pointer;margin-bottom:var(--space-md)">
+          <input type="checkbox" id="ts-nightout" style="width:24px;height:24px;accent-color:var(--accent)" onchange="document.getElementById('nightout-location-wrap').classList.toggle('hidden', !this.checked)">
+          <span style="font-weight:600">Night Out (Sleeping in cab)</span>
+        </label>
+        <div id="nightout-location-wrap" class="form-group hidden"><label>Night Out Location</label><input type="text" class="form-input" id="ts-nightout-loc" placeholder="e.g. M1 Toddington Services" /></div>
+      </div>
+      
       <div class="section-header mt-lg"><span class="section-title">History</span></div>
       <div class="list-card">
         ${ts.length === 0 ? '<div class="empty-state"><span class="material-icons-round">schedule</span><h3>No timesheets yet</h3><p>Start your first shift above</p></div>' : ''}
         ${ts.map(t => `
-          <div class="list-item">
+          <div class="list-item" style="flex-wrap:wrap">
             <div class="list-item-icon" style="background:var(--info-bg);color:var(--info)"><span class="material-icons-round">schedule</span></div>
-            <div class="list-item-content"><div class="list-item-title">${t.date}</div><div class="list-item-subtitle">${t.start}–${t.end||'ongoing'} · Breaks: ${t.breaks}min · ${t.mileage}mi</div></div>
-            <span class="badge badge-${t.status==='approved'?'success':t.status==='active'?'warning':'info'}">${t.status}</span>
+            <div class="list-item-content" style="min-width:200px">
+              <div class="list-item-title">${t.date}</div>
+              <div class="list-item-subtitle">${t.start}–${t.end||'ongoing'} · Breaks: ${t.breaks}m · ${t.mileage}mi</div>
+              ${t.dieselAdded ? `<div style="font-size:11px;color:var(--text-muted);margin-top:4px">⛽ ${t.dieselAdded}L Diesel (Odo: ${t.dieselMileage})</div>` : ''}
+              ${t.adBlueAdded ? `<div style="font-size:11px;color:var(--text-muted)">💧 ${t.adBlueAdded}L AdBlue (Odo: ${t.adBlueMileage})</div>` : ''}
+              ${t.nightOut ? `<div style="font-size:11px;color:var(--accent);font-weight:600">🌙 Night Out: ${t.nightOutLocation}</div>` : ''}
+            </div>
+            <div class="list-item-meta" style="flex-shrink:0">
+              <span class="badge badge-${t.status==='approved'?'success':t.status==='active'?'warning':'info'}">${t.status}</span>
+            </div>
           </div>`).join('')}
       </div>`;
   },
@@ -757,7 +783,7 @@ const App = {
       this.navigate('defects');
       return;
     }
-    const ts = { id: Date.now(), driverId: this.state.user.id, date: this.todayStr(), start: new Date().toTimeString().slice(0,5), end: null, breaks: 0, mileage: 0, status: 'active' };
+    const ts = { id: Date.now(), driverId: this.state.user.id, date: this.todayStr(), start: new Date().toTimeString().slice(0,5), end: null, breaks: 0, mileage: 0, dieselAdded: 0, dieselMileage: 0, adBlueAdded: 0, adBlueMileage: 0, nightOut: false, nightOutLocation: '', status: 'active' };
     this.data.timesheets.unshift(ts); this.saveData('timesheets');
     this.state.timerRunning = true; this.state.timerElapsed = 0; this.state.timerStart = Date.now();
     this.state.timerInterval = setInterval(() => this.tickTimer(), 1000);
@@ -783,6 +809,13 @@ const App = {
       active.end = new Date().toTimeString().slice(0,5); active.status = 'submitted';
       const mileage = document.getElementById('ts-mileage')?.value;
       if (mileage) active.mileage = parseInt(mileage);
+      active.dieselAdded = parseInt(document.getElementById('ts-diesel')?.value || '0');
+      active.dieselMileage = parseInt(document.getElementById('ts-diesel-odo')?.value || '0');
+      active.adBlueAdded = parseInt(document.getElementById('ts-adblue')?.value || '0');
+      active.adBlueMileage = parseInt(document.getElementById('ts-adblue-odo')?.value || '0');
+      active.nightOut = document.getElementById('ts-nightout')?.checked || false;
+      active.nightOutLocation = document.getElementById('ts-nightout-loc')?.value || '';
+
       this.saveData('timesheets');
     }
     this.state.timerElapsed = 0;

@@ -294,14 +294,32 @@ const AdminScreens = {
       <h1 class="screen-title">All Timesheets</h1>
       <p class="screen-subtitle">Review and approve driver timesheets</p>
       <div class="card" style="overflow-x:auto">
-        <table class="data-table">
-          <thead><tr><th>Driver</th><th>Date</th><th>Start</th><th>End</th><th>Breaks</th><th>Mileage</th><th>Status</th></tr></thead>
+        <table class="data-table" style="min-width: 800px">
+          <thead><tr><th>Driver</th><th>Date</th><th>Start</th><th>End</th><th>Duration / Breaks</th><th>Mileage</th><th>Fuel / AdBlue</th><th>Night Out</th><th>Status</th></tr></thead>
           <tbody>
             ${App.data.timesheets.map(t => {
               const d = App.getDriver(t.driverId);
+              let durationStr = '—';
+              if (t.start && t.end) {
+                const [sh,sm] = t.start.split(':').map(Number);
+                const [eh,em] = t.end.split(':').map(Number);
+                let mins = (eh*60+em) - (sh*60+sm);
+                if (mins < 0) mins += 24*60;
+                durationStr = `${Math.floor(mins/60)}h ${mins%60}m`;
+              }
+              const fuelStr = t.dieselAdded ? `${t.dieselAdded}L Diesel<br><span style="font-size:10px;color:var(--text-muted)">Odo: ${t.dieselMileage}</span>` : '—';
+              const adbStr = t.adBlueAdded ? `${t.adBlueAdded}L AdBlue<br><span style="font-size:10px;color:var(--text-muted)">Odo: ${t.adBlueMileage}</span>` : '—';
+              const noStr = t.nightOut ? `Yes<br><span style="font-size:10px;color:var(--accent)">${t.nightOutLocation}</span>` : 'No';
+
               return `<tr>
-                <td>${d?.name || 'Unknown'}</td><td>${t.date}</td><td>${t.start}</td><td>${t.end || '—'}</td>
-                <td>${t.breaks}min</td><td>${t.mileage}mi</td>
+                <td><strong>${d?.name || 'Unknown'}</strong></td>
+                <td>${t.date}</td>
+                <td>${t.start}</td>
+                <td>${t.end || '—'}</td>
+                <td>${durationStr}<br><span style="font-size:10px;color:var(--text-muted)">Breaks: ${t.breaks}m</span></td>
+                <td>${t.mileage}mi</td>
+                <td><div style="line-height:1.2">${fuelStr}<br>${adbStr !== '—' ? adbStr : ''}</div></td>
+                <td><div style="line-height:1.2">${noStr}</div></td>
                 <td><span class="badge badge-${t.status==='approved'?'success':t.status==='active'?'warning':'info'}">${t.status}</span></td>
               </tr>`;
             }).join('')}
@@ -453,26 +471,50 @@ const AdminScreens = {
       </div>`;
   },
 
-  exportCSV() {
-    const sections = [
-      { name: 'TIMESHEETS', headers: ['Driver','Date','Start','End','Breaks(min)','Mileage','Status'],
-        rows: App.data.timesheets.map(t => [App.getDriver(t.driverId)?.name,t.date,t.start,t.end||'',t.breaks,t.mileage,t.status]) },
-      { name: 'DEFECTS', headers: ['Driver','Vehicle','Date','Category','Severity','Description','Status'],
-        rows: App.data.defects.map(d => [App.getDriver(d.driverId)?.name,d.vehicle,d.date,d.category,d.severity,d.description,d.status]) },
-      { name: 'PODS', headers: ['Driver','Date','Recipient','Location','Notes','Status'],
-        rows: App.data.pods.map(p => [App.getDriver(p.driverId)?.name,p.date,p.recipient,p.location,p.notes,p.status]) },
-    ];
-    let csv = 'G. & M. Hartshorne Ltd — Fleet Data Export\n\n';
-    sections.forEach(s => {
-      csv += `--- ${s.name} ---\n${s.headers.join(',')}\n`;
-      s.rows.forEach(r => { csv += r.map(c => `"${c}"`).join(',') + '\n'; });
-      csv += '\n';
-    });
+  exportCSV(type) {
+    let csv = '';
+    if (type === 'timesheets') {
+      csv = 'ID,Driver,Date,StartTime,EndTime,Breaks(min),Mileage,Diesel(L),Diesel_Odo,AdBlue(L),AdBlue_Odo,NightOut,NightOutLocation,Status\n';
+      App.data.timesheets.forEach(t => {
+        const d = App.getDriver(t.driverId);
+        csv += `${t.id},"${d?.name||'Unknown'}",${t.date},${t.start},${t.end||''},${t.breaks},${t.mileage},${t.dieselAdded||0},${t.dieselMileage||0},${t.adBlueAdded||0},${t.adBlueMileage||0},${t.nightOut?'Yes':'No'},"${t.nightOutLocation||''}",${t.status}\n`;
+      });
+    } else if (type === 'defects') {
+      csv = 'ID,Driver,Vehicle,Date,Category,Severity,Description,Status\n';
+      App.data.defects.forEach(d => {
+        const dr = App.getDriver(d.driverId);
+        csv += `${d.id},"${dr?.name||'Unknown'}",${d.vehicle},${d.date},${d.category},${d.severity},"${d.description}",${d.status}\n`;
+      });
+    } else if (type === 'pods') {
+      csv = 'ID,Driver,Date,Recipient,Location,Notes,Status\n';
+      App.data.pods.forEach(p => {
+        const d = App.getDriver(p.driverId);
+        csv += `${p.id},"${d?.name||'Unknown'}",${p.date},"${p.recipient}","${p.location}","${p.notes}",${p.status}\n`;
+      });
+    } else {
+      const sections = [
+        { name: 'TIMESHEETS', headers: ['ID','Driver','Date','StartTime','EndTime','Breaks(min)','Mileage','Diesel(L)','Diesel_Odo','AdBlue(L)','AdBlue_Odo','NightOut','NightOutLocation','Status'],
+          rows: App.data.timesheets.map(t => [t.id||'',App.getDriver(t.driverId)?.name||'',t.date||'',t.start||'',t.end||'',t.breaks||0,t.mileage||0,t.dieselAdded||0,t.dieselMileage||0,t.adBlueAdded||0,t.adBlueMileage||0,t.nightOut?'Yes':'No',t.nightOutLocation||'',t.status||'']) },
+        { name: 'DEFECTS', headers: ['ID','Driver','Vehicle','Date','Category','Severity','Description','Status'],
+          rows: App.data.defects.map(d => [d.id||'',App.getDriver(d.driverId)?.name||'',d.vehicle||'',d.date||'',d.category||'',d.severity||'',d.description||'',d.status||'']) },
+        { name: 'PODS', headers: ['ID','Driver','Date','Recipient','Location','Notes','Status'],
+          rows: App.data.pods.map(p => [p.id||'',App.getDriver(p.driverId)?.name||'',p.date||'',p.recipient||'',p.location||'',p.notes||'',p.status||'']) },
+      ];
+      csv = 'G. & M. Hartshorne Ltd — Fleet Data Export\n\n';
+      sections.forEach(s => {
+        csv += `--- ${s.name} ---\n${s.headers.join(',')}\n`;
+        s.rows.forEach(r => { csv += r.map(c => `"${c}"`).join(',') + '\n'; });
+        csv += '\n';
+      });
+    }
+
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `gmh-fleet-export-${App.todayStr()}.csv`;
-    a.click(); URL.revokeObjectURL(url);
-    App.toast('Data exported successfully!', 'success');
+    a.href = url;
+    a.download = `gmh_export_${type||'all'}_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    App.toast('Export downloaded', 'success');
   },
 };
