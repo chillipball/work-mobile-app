@@ -454,8 +454,8 @@ const App = {
       </div>
       <div class="card mb-lg">
         <div class="form-row">
-          <div class="form-group"><label>Tractor Unit</label><input type="text" class="form-input" id="wa-vehicle" value="${this.state.user?.vehicle||''}" readonly /></div>
-          <div class="form-group"><label>Trailer ID</label><input type="text" class="form-input" id="wa-trailer" value="${this.state.user?.trailer||''}" readonly /></div>
+          <div class="form-group"><label>Tractor Unit</label><input type="text" class="form-input" id="wa-vehicle" value="${this.state.user?.vehicle||''}" placeholder="e.g. AB12 CDE" /></div>
+          <div class="form-group"><label>Trailer ID</label><input type="text" class="form-input" id="wa-trailer" value="${this.state.user?.trailer||''}" placeholder="e.g. TR-240" /></div>
         </div>
         <div class="form-group"><label>Odometer Reading</label><input type="number" class="form-input" id="wa-odometer" placeholder="e.g. 245891" inputmode="numeric" /></div>
       </div>
