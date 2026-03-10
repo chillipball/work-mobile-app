@@ -263,10 +263,10 @@ const App = {
     return `
       <h1 class="screen-title">Hello, ${u.name.split(' ')[0]} 👋</h1>
       <p class="screen-subtitle">${new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
-      ${vehicle ? `
+      ${(vehicle || u.vehicle) ? `
         <div class="vehicle-card" style="cursor:pointer" data-action="nav" data-target="vehicle-link">
-          <div class="reg-plate">${vehicle.reg}</div>
-          <div class="vehicle-info">${vehicle.type} · <span class="status-dot active"></span> Active</div>
+          <div class="reg-plate">${vehicle ? vehicle.reg : u.vehicle}</div>
+          <div class="vehicle-info">${vehicle ? vehicle.type : 'Unknown Type'} · <span class="status-dot active"></span> Active</div>
           ${u.trailer ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);font-size:var(--text-sm);color:var(--text-secondary)"><span class="material-icons-round" style="font-size:16px;vertical-align:middle;margin-right:4px">rv_hookup</span>Trailer: <strong style="color:var(--text-main)">${u.trailer}</strong></div>` : ''}
         </div>
       ` : `
@@ -421,11 +421,12 @@ const App = {
       { id: 20, label: 'Speed Limiter' },
       { id: 21, label: 'Speedometer' },
     ];
-    if (todayCheck) {
+    if (todayCheck && !this.state.showNewWalkaround) {
       const defectItems = todayCheck.items.filter(i => i.status === 'fail');
       return `
         <h1 class="screen-title">Daily Walkaround</h1>
-        <p class="screen-subtitle">Today's check completed at ${todayCheck.time}</p>
+        <p class="screen-subtitle">Latest check completed at ${todayCheck.time}</p>
+        <button class="btn btn-accent btn-full mb-lg" id="btn-show-new-walkaround"><span class="material-icons-round">add_circle</span>New Walkaround Check</button>
         <div class="card" style="border-left:3px solid ${todayCheck.nilDefect?'var(--success)':'var(--warning)'}">
           <div class="flex-between">
             <div>
@@ -530,14 +531,25 @@ const App = {
         <div class="form-group"><label>Recipient / Company</label><input type="text" class="form-input" id="pod-recipient" placeholder="e.g. Travis Perkins" required /></div>
         <div class="form-group"><label>Location</label><input type="text" class="form-input" id="pod-location" placeholder="e.g. Mansfield" required /></div>
         <div class="form-group"><label>Notes</label><textarea class="form-input" id="pod-notes" placeholder="Signed by, left at bay #, etc."></textarea></div>
-        <button class="btn btn-primary mt-md" id="btn-submit-pod"><span class="material-icons-round">send</span>Submit POD</button>
+        <div class="form-group mb-lg">
+          <label>Capture Signed Document (optional)</label>
+          <div style="display:flex; gap:8px; align-items:flex-end;">
+            <label class="btn btn-outline" style="cursor:pointer; flex: 1; text-align:center;">
+              <span class="material-icons-round">camera_alt</span> Take Photo
+              <input type="file" id="pod-photo" accept="image/*" capture="environment" style="display:none;" />
+            </label>
+          </div>
+          <img id="pod-photo-preview" class="hidden mt-md" style="width:100%; border-radius:8px; border:1px solid rgba(255,255,255,0.1);" />
+        </div>
+        <button class="btn btn-primary mt-md btn-full" id="btn-submit-pod"><span class="material-icons-round">send</span>Submit POD</button>
       </div>
       <div class="list-card">
         ${pods.length === 0 ? '<div class="empty-state"><span class="material-icons-round">inventory</span><h3>No PODs logged</h3><p>Log your first delivery above</p></div>' : ''}
         ${pods.map(p => `
           <div class="list-item">
             <div class="list-item-icon" style="background:var(--success-bg);color:var(--success)"><span class="material-icons-round">inventory</span></div>
-            <div class="list-item-content"><div class="list-item-title">${p.recipient}</div><div class="list-item-subtitle">${p.date} · ${p.location} · ${p.notes}</div></div>
+            <div class="list-item-content"><div class="list-item-title">${p.recipient}</div><div class="list-item-subtitle">${p.date} · ${p.location} · ${p.notes}</div>
+            ${p.photo ? `<div style="margin-top:8px;font-size:var(--text-xs);color:var(--info);display:flex;align-items:center;gap:4px;"><span class="material-icons-round" style="font-size:14px">image</span>Photo Attached</div>` : ''}</div>
             <span class="badge badge-success">${p.status}</span>
           </div>`).join('')}
       </div>`;
@@ -612,15 +624,17 @@ const App = {
     document.getElementById('btn-save-trailer')?.addEventListener('click', () => {
       const tr = document.getElementById('link-trailer-input').value.trim();
       this.state.user.trailer = tr;
-      localStorage.setItem('gmh_user', JSON.stringify(this.state.user));
-      const di = this.data.drivers.findIndex(d => d.id === this.state.user.id);
-      if (di > -1) this.data.drivers[di].trailer = tr;
-      this.saveData('drivers');
+      this.saveLocalUserAndDriver();
       this.toast(tr ? 'Trailer ' + tr + ' linked!' : 'Trailer unlinked', 'success');
       this.render();
     });
 
     // Walkaround Defect Logic
+    document.getElementById('btn-show-new-walkaround')?.addEventListener('click', () => {
+      this.state.showNewWalkaround = true;
+      this.render();
+    });
+
     document.querySelectorAll('.wa-check').forEach(cb => {
       cb.addEventListener('change', (e) => {
         const id = e.target.dataset.id;
@@ -672,16 +686,54 @@ const App = {
         status: isNil ? 'resolved' : 'reported' // For admin panel compatibility
       };
 
+      // Auto update linked vehicles
+      this.state.user.vehicle = vehicle;
+      this.state.user.trailer = trailer;
+      this.saveLocalUserAndDriver();
+
       this.data.defects.unshift(check);
       this.saveData('defects');
+      this.state.showNewWalkaround = false;
       this.toast('Walkaround check submitted!', 'success');
       this.render();
     });
+    
     // POD form
+    let currentPodPhoto = null;
+    document.getElementById('pod-photo')?.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        this.compressImage(file, (dataUrl) => {
+          currentPodPhoto = dataUrl;
+          const preview = document.getElementById('pod-photo-preview');
+          preview.src = dataUrl;
+          preview.classList.remove('hidden');
+        });
+      }
+    });
+
     document.getElementById('btn-new-pod')?.addEventListener('click', () => document.getElementById('pod-form').classList.toggle('hidden'));
     document.getElementById('btn-submit-pod')?.addEventListener('click', () => {
-      const p = { id: Date.now(), driverId: this.state.user.id, date: this.todayStr(), recipient: document.getElementById('pod-recipient').value, location: document.getElementById('pod-location').value, notes: document.getElementById('pod-notes').value, status: 'confirmed' };
-      this.data.pods.push(p); this.saveData('pods'); this.toast('POD logged successfully!', 'success'); this.render();
+      const rec = document.getElementById('pod-recipient').value;
+      const loc = document.getElementById('pod-location').value;
+      const notes = document.getElementById('pod-notes').value;
+      if (!rec || !loc) { this.toast('Recipient and Location are required', 'error'); return; }
+      
+      const p = { 
+        id: Date.now(), driverId: this.state.user.id, date: this.todayStr(), 
+        recipient: rec, location: loc, notes: notes, 
+        photo: currentPodPhoto, status: 'confirmed' 
+      };
+      this.data.pods.unshift(p); 
+      this.saveData('pods'); 
+      currentPodPhoto = null; // Reset
+      document.getElementById('pod-photo-preview').classList.add('hidden');
+      document.getElementById('pod-recipient').value = '';
+      document.getElementById('pod-location').value = '';
+      document.getElementById('pod-notes').value = '';
+      document.getElementById('pod-form').classList.add('hidden');
+      this.toast('POD logged successfully!', 'success'); 
+      this.render();
     });
     // Timesheet controls
     document.getElementById('btn-start-shift')?.addEventListener('click', () => this.startShift());
@@ -746,6 +798,42 @@ const App = {
   // ============================================================
   renderAdminShell() { return typeof AdminScreens !== 'undefined' ? AdminScreens.renderShell() : '<p>Loading admin...</p>'; },
   bindAdmin() { if (typeof AdminScreens !== 'undefined') AdminScreens.bind(); },
+
+  saveLocalUserAndDriver() {
+    localStorage.setItem('gmh_user', JSON.stringify(this.state.user));
+    const di = this.data.drivers.findIndex(d => d.id === this.state.user.id);
+    if (di > -1) {
+      this.data.drivers[di].vehicle = this.state.user.vehicle;
+      this.data.drivers[di].trailer = this.state.user.trailer;
+      this.saveData('drivers');
+    }
+  },
+
+  compressImage(file, callback) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 800;
+        const MAX_HEIGHT = 800;
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+        } else {
+          if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        callback(canvas.toDataURL('image/jpeg', 0.6));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
 };
 
 // --- Boot ---

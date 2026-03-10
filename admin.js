@@ -84,6 +84,15 @@ const AdminScreens = {
     document.querySelectorAll('[data-reset-pin]').forEach(btn => {
       btn.addEventListener('click', (e) => { e.stopPropagation(); this.resetPin(parseInt(btn.dataset.resetPin)); });
     });
+    document.querySelectorAll('[data-action="view-pod-photo"]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const podId = parseInt(btn.dataset.id);
+        const pod = App.data.pods.find(p => p.id === podId);
+        if (pod && pod.photo) {
+          App.showInstructionModal({ title: 'POD: ' + pod.recipient, type: 'info', message: `<img src="${pod.photo}" style="width:100%; border-radius:8px;">` });
+        }
+      });
+    });
   },
 
   // --- Admin Dashboard ---
@@ -265,13 +274,14 @@ const AdminScreens = {
       <p class="screen-subtitle">All POD records</p>
       <div class="card" style="overflow-x:auto">
         <table class="data-table">
-          <thead><tr><th>Driver</th><th>Date</th><th>Recipient</th><th>Location</th><th>Notes</th><th>Status</th></tr></thead>
+          <thead><tr><th>Driver</th><th>Date</th><th>Recipient</th><th>Location</th><th>Notes</th><th>Photo</th><th>Status</th></tr></thead>
           <tbody>
             ${App.data.pods.map(p => {
               const driver = App.getDriver(p.driverId);
               return `<tr>
                 <td>${driver?.name || 'Unknown'}</td><td>${p.date}</td><td>${p.recipient}</td>
                 <td>${p.location}</td><td>${p.notes}</td>
+                <td>${p.photo ? `<button class="btn btn-outline btn-sm" data-action="view-pod-photo" data-id="${p.id}"><span class="material-icons-round" style="font-size:16px; margin-right:4px;">image</span>View</button>` : '<span class="text-muted" style="font-size:var(--text-sm)">No photo</span>'}</td>
                 <td><span class="badge badge-success">${p.status}</span></td>
               </tr>`;
             }).join('')}
