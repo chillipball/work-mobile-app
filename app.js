@@ -587,10 +587,7 @@ const App = {
             <label style="font-weight:600;font-size:var(--text-sm)">Feet <span style="color:var(--danger)">*</span></label>
             <select class="form-select" id="wa-height-ft" style="font-size:18px;text-align:center;padding:12px;-webkit-appearance:none">
               <option value="">--</option>
-              <option value="4">4 ft</option>
-              <option value="5">5 ft</option>
-              <option value="6">6 ft</option>
-              <option value="7">7 ft</option>
+              ${Array.from({length:11}, (_,i) => '<option value="'+(i+6)+'">'+(i+6)+' ft</option>').join('')}
             </select>
           </div>
           <div class="form-group" style="flex:1;margin-bottom:0">
