@@ -532,7 +532,7 @@ const App = {
           ${defectItems.length > 0 ? `<div class="divider"></div>${defectItems.map(di => `
             <div style="padding:var(--space-sm) 0"><strong>${di.label}</strong><p style="color:var(--text-secondary);font-size:var(--text-sm)">${di.notes||'No details'}</p></div>
           `).join('')}` : ''}
-          <div style="font-size:var(--text-sm);color:var(--text-secondary);margin-top:8px"><strong>Odometer:</strong> ${todayCheck.odometer || '—'} mi${todayCheck.driverHeight ? ' · <strong>Height:</strong> ' + todayCheck.driverHeight : ''}</div>
+          <div style="font-size:var(--text-sm);color:var(--text-secondary);margin-top:8px"><strong>Odometer:</strong> ${todayCheck.odometer || '—'} mi${todayCheck.vehicleHeight ? ' · <strong>Vehicle Height:</strong> ' + todayCheck.vehicleHeight : ''}</div>
           ${todayCheck.additionalNotes ? `<div class="divider"></div><p style="font-size:var(--text-sm);color:var(--text-secondary)"><strong>Notes:</strong> ${todayCheck.additionalNotes}</p>` : ''}
           ${todayCheck.cornerPhotos && Object.keys(todayCheck.cornerPhotos).length > 0 ? `
             <div class="divider"></div>
@@ -578,10 +578,10 @@ const App = {
       </div>
       <div class="card mb-lg" style="border-left:3px solid var(--info)">
         <div class="card-header">
-          <span class="card-title"><span class="material-icons-round" style="font-size:20px;vertical-align:middle;margin-right:6px">height</span>Driver Height Check</span>
+          <span class="card-title"><span class="material-icons-round" style="font-size:20px;vertical-align:middle;margin-right:6px">height</span>Vehicle Height Check</span>
           <span class="badge badge-danger">Required</span>
         </div>
-        <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:var(--space-md)">Enter your height as shown on your medical/licence records.</p>
+        <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:var(--space-md)">Enter the vehicle height as displayed on the cab plate.</p>
         <div style="display:flex;gap:16px;align-items:flex-end">
           <div class="form-group" style="flex:1;margin-bottom:0">
             <label style="font-weight:600;font-size:var(--text-sm)">Feet <span style="color:var(--danger)">*</span></label>
@@ -1018,7 +1018,7 @@ const App = {
       // Mandatory field validation
       if (!vehicle) { this.toast('Registration (Tractor Unit) is required', 'error'); document.getElementById('wa-vehicle')?.focus(); return; }
       if (!odometer) { this.toast('Odometer reading is required', 'error'); document.getElementById('wa-odometer')?.focus(); return; }
-      if (!heightFt || heightIn === '') { this.toast('Driver height is required — select feet and inches', 'error'); document.getElementById('wa-height-ft')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+      if (!heightFt || heightIn === '') { this.toast('Vehicle height is required — select feet and inches', 'error'); document.getElementById('wa-height-ft')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
       if (!signature) { this.toast('Driver signature is required', 'error'); document.getElementById('wa-signature')?.focus(); return; }
 
       // Require all 4 corner photos
@@ -1043,11 +1043,11 @@ const App = {
       if (!isNil && failedItems.length === 0) { this.toast('Select defects or tick NIL DEFECT', 'error'); return; }
       if (missingNotes) { this.toast('Please describe all selected defects', 'error'); return; }
 
-      const driverHeight = heightFt + "'" + heightIn + '"';
+      const vehicleHeight = heightFt + "'" + heightIn + '"';
       const check = {
         id: Date.now(), driverId: this.state.user.id, type: 'walkaround', vehicle, trailer,
         date: this.todayStr(), time: new Date().toTimeString().slice(0,5),
-        odometer, driverHeight, nilDefect: isNil, items: failedItems,
+        odometer, vehicleHeight, nilDefect: isNil, items: failedItems,
         additionalNotes: additional, reportedTo, signature,
         cornerPhotos: { ...this.state.cornerPhotos }, // Save all 4 corner photos
         status: isNil ? 'resolved' : 'reported'

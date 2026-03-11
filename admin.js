@@ -786,8 +786,8 @@ const AdminScreens = {
             <div style="font-weight:700;margin-top:4px;font-size:16px;color:var(--info)">${d.odometer || '—'}</div>
           </div>
           <div style="background:rgba(0,200,83,0.08);border-radius:8px;padding:12px;border:1px solid rgba(0,200,83,0.15)">
-            <div style="font-size:11px;color:var(--success);text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Driver Height</div>
-            <div style="font-weight:700;margin-top:4px;font-size:16px;color:var(--success)">${d.driverHeight || '—'}</div>
+            <div style="font-size:11px;color:var(--success);text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Vehicle Height</div>
+            <div style="font-weight:700;margin-top:4px;font-size:16px;color:var(--success)">${d.vehicleHeight || '—'}</div>
           </div>
         </div>
 
