@@ -12,6 +12,7 @@ const App = {
     timerStart: null,
     timerElapsed: 0,
     timerInterval: null,
+    cornerPhotos: {}, // { front, rear, nearside, offside } — base64 strings
   },
 
   // --- Demo Data ---
@@ -331,6 +332,20 @@ const App = {
   // ============================================================
   renderVehicleLink() {
     const u = this.state.user;
+    const trailerItems = [
+      { id: 1, label: 'Trailer Lights (markers, rear, indicators)' },
+      { id: 2, label: 'Coupling / King Pin / Turntable' },
+      { id: 3, label: 'Landing Legs / Stands' },
+      { id: 4, label: 'Tyres & Wheel Nuts' },
+      { id: 5, label: 'Body / Curtains / Sheeting' },
+      { id: 6, label: 'Straps, Ratchets & Lashing Points' },
+      { id: 7, label: 'Rear Doors, Pins & Locking Bars' },
+      { id: 8, label: 'Mud Flaps & Spray Suppressants' },
+      { id: 9, label: 'Reflectors & Marker Boards' },
+      { id: 10, label: 'Air Lines / Brake Lines / Electrical Lines' },
+      { id: 11, label: 'Underrun Bars (front & rear)' },
+      { id: 12, label: 'Load Restraint Equipment' },
+    ];
     return `
       <h1 class="screen-title">Vehicle & Trailer</h1>
       <p class="screen-subtitle">Select your tractor unit and trailer for today</p>
@@ -341,8 +356,61 @@ const App = {
           <input type="text" class="form-input" id="link-trailer-input" placeholder="e.g. TR-240" value="${u.trailer || ''}" style="margin-bottom:0;" />
           <button class="btn btn-primary" id="btn-save-trailer" style="white-space:nowrap">Save Trailer</button>
         </div>
+        <div style="margin-top:var(--space-md);padding-top:var(--space-md);border-top:1px solid rgba(255,255,255,0.08)">
+          <label style="display:flex;align-items:center;gap:12px;cursor:pointer">
+            <input type="checkbox" id="chk-trailer-changed" style="width:24px;height:24px;accent-color:var(--accent);flex-shrink:0" />
+            <div>
+              <div style="font-weight:600;font-size:var(--text-sm)">Trailer Changed</div>
+              <div style="font-size:var(--text-xs);color:var(--text-muted)">Tick to complete a trailer defect inspection</div>
+            </div>
+          </label>
+        </div>
       </div>
-      
+
+      <div id="trailer-defect-section" class="hidden">
+        <div class="card mb-lg" style="border-left:3px solid var(--accent)">
+          <div class="flex gap-md" style="align-items:center">
+            <span class="material-icons-round text-accent">rv_hookup</span>
+            <p style="font-size:var(--text-sm);color:var(--text-secondary)">Check all trailer items. <strong>Tick only if a defect is found.</strong> Leave unchecked if OK.</p>
+          </div>
+        </div>
+        <div class="section-header"><span class="section-title">Trailer Check</span><span class="section-title" style="font-size:var(--text-xs)">&#10003; Tick if defect</span></div>
+        <div class="list-card mb-lg">
+          ${trailerItems.map(item => `
+            <div class="list-item walkaround-item" id="trl-row-${item.id}" style="flex-wrap:wrap">
+              <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-muted);width:28px;flex-shrink:0">${item.id}.</span>
+              <div class="list-item-content" style="flex:1;min-width:150px"><div class="list-item-title" style="font-size:var(--text-sm)">${item.label}</div></div>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex-shrink:0">
+                <input type="checkbox" class="trl-check" data-id="${item.id}" style="width:22px;height:22px;accent-color:var(--danger);cursor:pointer" />
+                <span style="font-size:var(--text-xs);color:var(--text-muted)">Defect</span>
+              </label>
+              <div class="wa-notes-wrap hidden" data-trl-notes-for="${item.id}" style="width:100%;margin-top:var(--space-sm);padding-left:36px">
+                <input type="text" class="form-input trl-notes" data-trl-notes-id="${item.id}" placeholder="Describe the defect..." style="font-size:var(--text-sm)" />
+              </div>
+            </div>
+          `).join('')}
+          <div class="list-item" style="background:var(--success-bg)">
+            <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-muted);width:28px">&#10003;</span>
+            <div class="list-item-content"><div class="list-item-title" style="font-size:var(--text-sm);color:var(--success)">NIL DEFECT &#8212; Trailer OK</div></div>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" id="trl-nil-defect" style="width:22px;height:22px;accent-color:var(--success);cursor:pointer" />
+              <span style="font-size:var(--text-xs);color:var(--success)">All OK</span>
+            </label>
+          </div>
+        </div>
+        <div class="card mb-lg">
+          <div class="card-header"><span class="card-title">Trailer Inspection Sign-Off</span></div>
+          <div class="form-group"><label>Additional Notes</label><textarea class="form-input" id="trl-additional" placeholder="Any other trailer issues or comments..."></textarea></div>
+          <div class="form-row">
+            <div class="form-group"><label>Reported To</label><input type="text" class="form-input" id="trl-reported-to" placeholder="e.g. Office / Workshop" /></div>
+            <div class="form-group"><label>Driver's Signature</label><input type="text" class="form-input" id="trl-signature" placeholder="Type your full name" /></div>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-full mb-lg" id="btn-submit-trailer-check">
+          <span class="material-icons-round">rv_hookup</span>Submit Trailer Inspection
+        </button>
+      </div>
+
       <div class="section-header"><span class="section-title">Select Tractor Unit</span></div>
       ${u.vehicle ? `<div class="vehicle-card mb-md"><div class="reg-plate">${u.vehicle}</div><div class="vehicle-info">${this.data.vehicles.find(v=>v.reg===u.vehicle)?.type || ''}</div></div>` : ''}
       <div class="list-card">
@@ -465,6 +533,22 @@ const App = {
             <div style="padding:var(--space-sm) 0"><strong>${di.label}</strong><p style="color:var(--text-secondary);font-size:var(--text-sm)">${di.notes||'No details'}</p></div>
           `).join('')}` : ''}
           ${todayCheck.additionalNotes ? `<div class="divider"></div><p style="font-size:var(--text-sm);color:var(--text-secondary)"><strong>Notes:</strong> ${todayCheck.additionalNotes}</p>` : ''}
+          ${todayCheck.cornerPhotos && Object.keys(todayCheck.cornerPhotos).length > 0 ? `
+            <div class="divider"></div>
+            <div style="margin-top:var(--space-sm)">
+              <div style="font-size:var(--text-xs);font-weight:600;color:var(--text-muted);margin-bottom:8px;display:flex;align-items:center;gap:4px">
+                <span class="material-icons-round" style="font-size:14px">photo_camera</span>Corner Photos Verified
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+                ${[{key:'front',label:'Front'},{key:'nearside',label:'Near'},{key:'offside',label:'Off'},{key:'rear',label:'Rear'}].map(c => `
+                  <div style="text-align:center">
+                    ${todayCheck.cornerPhotos[c.key] ? `<img src="${todayCheck.cornerPhotos[c.key]}" alt="${c.label}" style="width:100%;border-radius:6px;border:1px solid rgba(255,255,255,0.1);aspect-ratio:1;object-fit:cover" />` : ''}
+                    <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${c.label}</div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
           <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-md)">Signed: ${todayCheck.signature} · Reported to: ${todayCheck.reportedTo||'N/A'}</div>
         </div>
         ${this.renderCheckHistory(checks)}`;
@@ -515,6 +599,31 @@ const App = {
           </label>
         </div>
       </div>
+      <div class="card mb-lg" style="border-left:3px solid var(--accent)">
+        <div class="card-header">
+          <span class="card-title">📸 Vehicle Corner Photos</span>
+          <span class="badge badge-danger">Required</span>
+        </div>
+        <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:var(--space-md)">Photograph all 4 corners of the lorry before submitting.</p>
+        <div class="corner-progress" id="corner-progress-bar-wrap">
+          <span class="material-icons-round" style="font-size:18px;color:var(--text-muted)">photo_camera</span>
+          <div class="corner-progress-bar-wrap">
+            <div class="corner-progress-bar" id="corner-progress-bar" style="width:${Math.round(Object.keys(this.state.cornerPhotos).length/4*100)}%"></div>
+          </div>
+          <span class="corner-progress-text" id="corner-progress-text">${Object.keys(this.state.cornerPhotos).length} / 4 corners</span>
+        </div>
+        <div class="corner-photo-grid">
+          ${[{key:'front',label:'Front'},{key:'nearside',label:'Nearside (Driver)'},{key:'offside',label:'Offside (Pass.)'},{key:'rear',label:'Rear'}].map(c => `
+            <label class="corner-photo-slot ${this.state.cornerPhotos[c.key] ? 'captured' : ''}" for="corner-input-${c.key}">
+              <div class="slot-check"><span class="material-icons-round">check</span></div>
+              ${this.state.cornerPhotos[c.key] ? `<img class="slot-thumb" src="${this.state.cornerPhotos[c.key]}" alt="${c.label}" />` : '<span class="material-icons-round slot-icon">add_a_photo</span>'}
+              <span class="slot-label">${c.label}</span>
+              <span class="slot-hint">Tap to capture</span>
+              <input type="file" id="corner-input-${c.key}" class="corner-photo-input" data-corner="${c.key}" accept="image/*" capture="environment" style="display:none" />
+            </label>
+          `).join('')}
+        </div>
+      </div>
       <div class="card mb-lg">
         <div class="card-header"><span class="card-title">Additional Information</span></div>
         <div class="form-group"><label>Record any defects or irregular circumstances</label><textarea class="form-input" id="wa-additional" placeholder="Write 'None' if no defects..."></textarea></div>
@@ -524,14 +633,15 @@ const App = {
         </div>
       </div>
       <button class="btn btn-primary btn-full mb-lg" id="btn-submit-walkaround"><span class="material-icons-round">check_circle</span>Submit Walkaround Check</button>
-      ${this.renderCheckHistory(checks)}`;
+      ${this.renderCheckHistory(checks)}
+      ${this.renderTrailerCheckHistory(checks)}`;
   },
 
   renderCheckHistory(checks) {
     const past = checks.filter(c => c.type === 'walkaround').sort((a,b) => b.id - a.id);
     if (past.length === 0) return '';
     return `
-      <div class="section-header mt-lg"><span class="section-title">History</span></div>
+      <div class="section-header mt-lg"><span class="section-title">Walkaround History</span></div>
       <div class="list-card">
         ${past.map(c => {
           const defCount = c.items ? c.items.filter(i => i.status === 'fail').length : 0;
@@ -542,6 +652,31 @@ const App = {
             <div class="list-item-content">
               <div class="list-item-title">${c.date} — Unit: ${c.vehicle||'N/A'} ${c.trailer ? '· Trl: '+c.trailer:''}</div>
               <div class="list-item-subtitle">${c.nilDefect ? 'Nil defect' : defCount + ' defect' + (defCount!==1?'s':'')} · Odo: ${c.odometer||'—'} · ${c.time}</div>
+            </div>
+            <span class="badge badge-${c.nilDefect?'success':'warning'}">${c.nilDefect?'pass':'defects'}</span>
+          </div>`;
+        }).join('')}
+      </div>`;
+  },
+
+  renderTrailerCheckHistory(checks) {
+    const past = checks.filter(c => c.type === 'trailer-check' && c.driverId === this.state.user?.id).sort((a,b) => b.id - a.id);
+    if (past.length === 0) return '';
+    return `
+      <div class="section-header mt-lg">
+        <span class="section-title">Trailer Check History</span>
+        <span class="material-icons-round" style="font-size:16px;color:var(--text-muted)">rv_hookup</span>
+      </div>
+      <div class="list-card">
+        ${past.map(c => {
+          const defCount = c.items ? c.items.filter(i => i.status === 'fail').length : 0;
+          return `<div class="list-item">
+            <div class="list-item-icon" style="background:${c.nilDefect?'var(--success-bg)':'var(--warning-bg)'};color:${c.nilDefect?'var(--success)':'var(--warning)'}">
+              <span class="material-icons-round">rv_hookup</span>
+            </div>
+            <div class="list-item-content">
+              <div class="list-item-title">${c.date} — Trailer: ${c.trailer||'N/A'}</div>
+              <div class="list-item-subtitle">${c.nilDefect ? 'Nil defect' : defCount + ' defect' + (defCount!==1?'s':'')} · ${c.time} · Signed: ${c.signature}</div>
             </div>
             <span class="badge badge-${c.nilDefect?'success':'warning'}">${c.nilDefect?'pass':'defects'}</span>
           </div>`;
@@ -677,6 +812,91 @@ const App = {
       this.state.user.trailer = tr;
       this.saveLocalUserAndDriver();
       this.toast(tr ? 'Trailer ' + tr + ' linked!' : 'Trailer unlinked', 'success');
+      // Don't full re-render so the defect section state is preserved
+    });
+
+    // Trailer Changed checkbox — show/hide defect section
+    document.getElementById('chk-trailer-changed')?.addEventListener('change', (e) => {
+      const section = document.getElementById('trailer-defect-section');
+      if (section) section.classList.toggle('hidden', !e.target.checked);
+    });
+
+    // Trailer defect item checkboxes
+    document.querySelectorAll('.trl-check').forEach(cb => {
+      cb.addEventListener('change', (e) => {
+        const id = e.target.dataset.id;
+        const notesWrap = document.querySelector(`[data-trl-notes-for="${id}"]`);
+        if (e.target.checked) {
+          notesWrap?.classList.remove('hidden');
+          document.getElementById('trl-nil-defect').checked = false;
+        } else {
+          notesWrap?.classList.add('hidden');
+          if (notesWrap) notesWrap.querySelector('input').value = '';
+        }
+      });
+    });
+
+    // Trailer nil defect checkbox
+    document.getElementById('trl-nil-defect')?.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        document.querySelectorAll('.trl-check').forEach(cb => { cb.checked = false; });
+        document.querySelectorAll('[data-trl-notes-for]').forEach(w => {
+          w.classList.add('hidden');
+          const inp = w.querySelector('input');
+          if (inp) inp.value = '';
+        });
+      }
+    });
+
+    // Submit trailer inspection
+    document.getElementById('btn-submit-trailer-check')?.addEventListener('click', () => {
+      const isNil = document.getElementById('trl-nil-defect').checked;
+      const signature = document.getElementById('trl-signature').value.trim();
+      const additional = document.getElementById('trl-additional').value.trim();
+      const reportedTo = document.getElementById('trl-reported-to').value.trim();
+      // Read trailer from the input (may have been updated since page load)
+      const trailer = document.getElementById('link-trailer-input').value.trim() || this.state.user.trailer || '';
+
+      if (!signature) { this.toast('Please enter your signature to confirm the inspection', 'error'); return; }
+
+      const failedItems = [];
+      let missingNotes = false;
+      document.querySelectorAll('.trl-check:checked').forEach(cb => {
+        const id = parseInt(cb.dataset.id);
+        const label = document.querySelector(`#trl-row-${id} .list-item-title`)?.textContent || '';
+        const notes = document.querySelector(`input[data-trl-notes-id="${id}"]`)?.value.trim() || '';
+        if (!notes) missingNotes = true;
+        failedItems.push({ id, label, status: 'fail', notes });
+      });
+
+      if (!isNil && failedItems.length === 0) { this.toast('Select defects or tick NIL DEFECT', 'error'); return; }
+      if (missingNotes) { this.toast('Please describe all selected defects', 'error'); return; }
+
+      const check = {
+        id: Date.now(),
+        driverId: this.state.user.id,
+        type: 'trailer-check',
+        vehicle: this.state.user.vehicle || '',
+        trailer,
+        date: this.todayStr(),
+        time: new Date().toTimeString().slice(0,5),
+        nilDefect: isNil,
+        items: failedItems,
+        additionalNotes: additional,
+        reportedTo,
+        signature,
+        status: isNil ? 'resolved' : 'reported'
+      };
+
+      // Save trailer on user if it was updated in the field
+      if (trailer && trailer !== this.state.user.trailer) {
+        this.state.user.trailer = trailer;
+        this.saveLocalUserAndDriver();
+      }
+
+      this.data.defects.unshift(check);
+      this.saveData('defects');
+      this.toast('Trailer inspection submitted!', 'success');
       this.render();
     });
 
@@ -705,6 +925,42 @@ const App = {
         document.querySelectorAll('.wa-notes-wrap').forEach(w => { w.classList.add('hidden'); w.querySelector('input').value = ''; });
       }
     });
+    // Corner photo capture
+    document.querySelectorAll('.corner-photo-input').forEach(input => {
+      input.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        const corner = e.target.dataset.corner;
+        if (file && corner) {
+          this.compressImage(file, (dataUrl) => {
+            this.state.cornerPhotos[corner] = dataUrl;
+            // Update progress bar without full re-render
+            const count = Object.keys(this.state.cornerPhotos).length;
+            const pct = Math.round(count / 4 * 100);
+            const bar = document.getElementById('corner-progress-bar');
+            const txt = document.getElementById('corner-progress-text');
+            if (bar) bar.style.width = pct + '%';
+            if (txt) txt.textContent = count + ' / 4 corners';
+            // Update slot appearance
+            const slot = e.target.closest('.corner-photo-slot');
+            if (slot) {
+              slot.classList.add('captured');
+              const existing = slot.querySelector('.slot-thumb');
+              if (existing) { existing.src = dataUrl; }
+              else {
+                const img = document.createElement('img');
+                img.className = 'slot-thumb';
+                img.src = dataUrl;
+                img.alt = corner;
+                slot.insertBefore(img, slot.firstChild);
+              }
+              const icon = slot.querySelector('.slot-icon');
+              if (icon) icon.style.display = 'none';
+            }
+          });
+        }
+      });
+    });
+
     document.getElementById('btn-submit-walkaround')?.addEventListener('click', () => {
       const isNil = document.getElementById('wa-nil-defect').checked;
       const vehicle = document.getElementById('wa-vehicle').value;
@@ -715,6 +971,15 @@ const App = {
       const signature = document.getElementById('wa-signature').value;
 
       if (!vehicle || !signature) { this.toast('Tractor Unit and Signature are required', 'error'); return; }
+
+      // Require all 4 corner photos
+      const requiredCorners = ['front', 'nearside', 'offside', 'rear'];
+      const missingCorners = requiredCorners.filter(c => !this.state.cornerPhotos[c]);
+      if (missingCorners.length > 0) {
+        this.toast(`Please photograph all 4 corners of the vehicle (${4 - missingCorners.length}/4 done)`, 'error');
+        document.getElementById('corner-progress-bar-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
 
       const failedItems = [];
       let missingNotes = false;
@@ -734,7 +999,8 @@ const App = {
         date: this.todayStr(), time: new Date().toTimeString().slice(0,5),
         odometer, nilDefect: isNil, items: failedItems,
         additionalNotes: additional, reportedTo, signature,
-        status: isNil ? 'resolved' : 'reported' // For admin panel compatibility
+        cornerPhotos: { ...this.state.cornerPhotos }, // Save all 4 corner photos
+        status: isNil ? 'resolved' : 'reported'
       };
 
       // Auto update linked vehicles
@@ -745,6 +1011,7 @@ const App = {
       this.data.defects.unshift(check);
       this.saveData('defects');
       this.state.showNewWalkaround = false;
+      this.state.cornerPhotos = {}; // Clear corner photos after submit
       this.toast('Walkaround check submitted!', 'success');
       this.render();
     });

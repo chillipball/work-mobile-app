@@ -97,6 +97,12 @@ const AdminScreens = {
         }
       });
     });
+    // Defect report detail viewer — click any row to open full detail
+    document.querySelectorAll('[data-action="open-defect"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.openDefectDetail(parseInt(btn.dataset.defectId));
+      });
+    });
     // Vehicle management
     document.getElementById('btn-show-add-vehicle')?.addEventListener('click', () => { document.getElementById('add-vehicle-form').classList.toggle('hidden'); });
     document.getElementById('btn-add-vehicle')?.addEventListener('click', () => this.addVehicle());
@@ -210,7 +216,7 @@ const AdminScreens = {
         <button class="btn btn-primary mt-md" id="btn-add-vehicle"><span class="material-icons-round">local_shipping</span>Add to Fleet</button>
       </div>
       <div class="list-card">
-        ${App.data.vehicles.map(v => {
+        ${App.data.vehicles.filter(v => v.status !== 'removed').map(v => {
           return `<div class="list-item">
             <div class="list-item-icon" style="background:var(--primary-glow);color:var(--primary)">
               <span class="material-icons-round">local_shipping</span>
@@ -275,10 +281,14 @@ const AdminScreens = {
   },
 
   removeVehicle(reg) {
-    App.confirm(`Are you sure you want to remove ${reg} from the fleet?`, () => {
-      App.data.vehicles = App.data.vehicles.filter(v => v.reg !== reg);
+    App.confirm(`Remove ${reg} from the active fleet? Defect history will be kept for 2 years.`, () => {
+      const v = App.data.vehicles.find(x => x.reg === reg);
+      if (v) {
+        v.status = 'removed';
+        v.removedDate = App.todayStr();
+      }
       this.saveVehicles();
-      App.toast(`Vehicle ${reg} removed.`, 'success');
+      App.toast(`Vehicle ${reg} removed from active fleet. History preserved.`, 'success');
       App.render();
     });
   },
@@ -455,27 +465,366 @@ const AdminScreens = {
         '<div class="list-card mt-md">' + daysHtml.join('') + '</div>';
   },
 
+  // --- Get all known vehicle regs (active fleet + historical defects) ---
+  getAllKnownVehicles() {
+    const vehicleMap = {};
+    // From fleet data (includes soft-deleted)
+    App.data.vehicles.forEach(v => {
+      vehicleMap[v.reg] = { reg: v.reg, type: v.type, status: v.status, removedDate: v.removedDate || null };
+    });
+    // From historical defect data (in case vehicle was hard-deleted in older data)
+    App.data.defects.forEach(d => {
+      if (d.vehicle && !vehicleMap[d.vehicle]) {
+        vehicleMap[d.vehicle] = { reg: d.vehicle, type: 'Unknown Type', status: 'removed', removedDate: null };
+      }
+    });
+    return Object.values(vehicleMap).sort((a, b) => {
+      // Active first, then removed, then alphabetical
+      if (a.status === 'active' && b.status !== 'active') return -1;
+      if (a.status !== 'active' && b.status === 'active') return 1;
+      return a.reg.localeCompare(b.reg);
+    });
+  },
+
   // --- Defects View ---
   renderDefects() {
+    const allVehicles = this.getAllKnownVehicles();
     return `
       <h1 class="screen-title">Defect Reports</h1>
-      <p class="screen-subtitle">All vehicle defect reports</p>
-      <div class="card" style="overflow-x:auto">
-        <table class="data-table">
-          <thead><tr><th>Driver</th><th>Vehicle</th><th>Date</th><th>Category</th><th>Severity</th><th>Description</th><th>Status</th></tr></thead>
-          <tbody>
-            ${App.data.defects.map(d => {
-              const driver = App.getDriver(d.driverId);
-              return `<tr>
-                <td>${driver?.name || 'Unknown'}</td><td>${d.vehicle}</td><td>${d.date}</td><td>${d.category}</td>
-                <td><span class="badge badge-${d.severity==='high'?'danger':d.severity==='medium'?'warning':'info'}">${d.severity}</span></td>
-                <td>${d.description}</td>
-                <td><span class="badge badge-${d.status==='resolved'?'success':'warning'}">${d.status}</span></td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
+      <p class="screen-subtitle">Vehicle weekly history and all walkaround checks</p>
+
+      <div class="card mb-lg" style="border-left:3px solid var(--accent)">
+        <div class="card-header"><span class="card-title"><span class="material-icons-round" style="font-size:20px;vertical-align:middle;margin-right:6px">local_shipping</span>Vehicle Weekly Defect History</span></div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Select Vehicle</label>
+            <select class="form-select" id="defect-vehicle" onchange="AdminScreens.updateDefectHistoryView()">
+              <option value="">-- Choose a vehicle --</option>
+              ${allVehicles.map(v => '<option value="' + v.reg + '">' + v.reg + ' — ' + v.type + (v.status === 'removed' ? ' (Removed)' : v.status === 'maintenance' ? ' (Maintenance)' : '') + '</option>').join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Week Commencing (Monday)</label>
+            <select class="form-select" id="defect-week" onchange="AdminScreens.updateDefectHistoryView()">
+              ${this.getRecentWeeksOptions()}
+            </select>
+          </div>
+        </div>
+        <div id="defect-history-results">
+          <div class="empty-state" style="padding:var(--space-lg) 0"><span class="material-icons-round">search</span><h3>Select a vehicle</h3><p>Choose a vehicle and week to view its defect history</p></div>
+        </div>
+      </div>
+
+      <div class="section-header"><span class="section-title">All Reports</span><span style="font-size:var(--text-xs);color:var(--text-muted)">${App.data.defects.length} total</span></div>
+      <p style="font-size:var(--text-sm);color:var(--text-muted);margin-bottom:var(--space-md)">Click any report to view full details and photos</p>
+      <div class="list-card">
+        ${App.data.defects.length === 0 ? '<div class="empty-state"><span class="material-icons-round">verified</span><h3>No defect reports</h3><p>Reports appear here when drivers submit walkaround checks</p></div>' : ''}
+        ${App.data.defects.map(d => this.renderDefectRow(d)).join('')}
       </div>`;
+  },
+
+  renderDefectRow(d) {
+    const driver = App.getDriver(d.driverId);
+    const isWalkaround = d.type === 'walkaround';
+    const isTrailerCheck = d.type === 'trailer-check';
+    const hasPhotos = d.cornerPhotos && Object.keys(d.cornerPhotos).length > 0;
+    const defectCount = d.items ? d.items.filter(i => i.status === 'fail').length : 0;
+    const typeLabel = isTrailerCheck ? 'Trailer Check' : isWalkaround ? 'Walkaround Check' : (d.category || 'Defect');
+
+    return `<div class="list-item" data-action="open-defect" data-defect-id="${d.id}" style="cursor:pointer;padding:var(--space-md);transition:background 0.15s" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background=''">
+      <div class="list-item-icon" style="background:${d.nilDefect?'var(--success-bg)':isWalkaround||isTrailerCheck?'var(--warning-bg)':'var(--'+((d.severity||'')===('high')?'danger':(d.severity||'')===('medium')?'warning':'info')+'-bg)'};color:${d.nilDefect?'var(--success)':isWalkaround||isTrailerCheck?'var(--warning)':'var(--'+((d.severity||'')===('high')?'danger':(d.severity||'')===('medium')?'warning':'info')+')'};flex-shrink:0">
+        <span class="material-icons-round">${isTrailerCheck?'rv_hookup':d.nilDefect?'check_circle':'report_problem'}</span>
+      </div>
+      <div class="list-item-content" style="flex:1;min-width:150px">
+        <div class="list-item-title">${typeLabel} — ${d.vehicle || 'N/A'} ${d.trailer ? '· Trl: '+d.trailer : ''}</div>
+        <div class="list-item-subtitle">${driver?.name || 'Unknown'} · ${d.date}${d.time ? ' at '+d.time : ''}</div>
+        <div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap">
+          <span class="badge badge-${d.nilDefect?'success':d.status==='resolved'?'success':'warning'}" style="font-size:11px">${d.nilDefect ? 'Nil Defect' : (isWalkaround||isTrailerCheck) ? defectCount + ' defect' + (defectCount!==1?'s':'') : d.status}</span>
+          ${hasPhotos ? '<span class="badge badge-info" style="font-size:11px"><span class="material-icons-round" style="font-size:12px;vertical-align:middle;margin-right:2px">photo_camera</span>4 Photos</span>' : ''}
+        </div>
+      </div>
+      <span class="material-icons-round" style="color:var(--text-muted);font-size:20px;flex-shrink:0">chevron_right</span>
+    </div>`;
+  },
+
+  updateDefectHistoryView() {
+    const vSelect = document.getElementById('defect-vehicle');
+    const wSelect = document.getElementById('defect-week');
+    const resDiv = document.getElementById('defect-history-results');
+    if (!vSelect || !wSelect || !resDiv) return;
+
+    const vehicleReg = vSelect.value;
+    const wcDateStr = wSelect.value;
+
+    if (!vehicleReg) {
+      resDiv.innerHTML = '<div class="empty-state" style="padding:var(--space-lg) 0"><span class="material-icons-round">search</span><h3>Select a vehicle</h3><p>Choose a vehicle and week to view its defect history</p></div>';
+      return;
+    }
+
+    // Calculate date range (Mon–Sun)
+    const wcDate = new Date(wcDateStr);
+    const dates = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(wcDate);
+      d.setDate(d.getDate() + i);
+      dates.push(d.toISOString().split('T')[0]);
+    }
+
+    // Filter defects for this vehicle in this week
+    const weekDefects = App.data.defects.filter(d => d.vehicle === vehicleReg && dates.includes(d.date));
+
+    // Stats
+    const totalChecks = weekDefects.filter(d => d.type === 'walkaround').length;
+    const totalDefects = weekDefects.reduce((sum, d) => sum + (d.items ? d.items.filter(i => i.status === 'fail').length : (d.status === 'reported' ? 1 : 0)), 0);
+    const photosCount = weekDefects.filter(d => d.cornerPhotos && Object.keys(d.cornerPhotos).length > 0).length;
+    const nilCount = weekDefects.filter(d => d.nilDefect).length;
+
+    // Day by day breakdown
+    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    let daysHtml = '';
+    dates.forEach((dateStr, idx) => {
+      const dayDefects = weekDefects.filter(d => d.date === dateStr);
+      const dayDate = new Date(dateStr);
+      const dayDisplay = dayDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+
+      if (dayDefects.length === 0) {
+        daysHtml += '<div class="list-item" style="opacity:0.5">' +
+          '<div class="list-item-icon" style="background:rgba(255,255,255,0.04);color:var(--text-muted);flex-shrink:0">' +
+            '<div style="font-size:12px;font-weight:700;line-height:1;text-align:center">' + dayNames[idx] + '<br><span style="font-size:16px">' + dayDate.getDate() + '</span></div>' +
+          '</div>' +
+          '<div class="list-item-content"><div class="list-item-subtitle">No checks recorded</div></div>' +
+        '</div>';
+      } else {
+        dayDefects.forEach(d => {
+          daysHtml += '<div class="list-item" data-action="open-defect" data-defect-id="' + d.id + '" style="cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=\'rgba(255,255,255,0.04)\'" onmouseout="this.style.background=\'\'">' +
+            '<div class="list-item-icon" style="background:rgba(255,255,255,0.04);color:var(--text-muted);flex-shrink:0">' +
+              '<div style="font-size:12px;font-weight:700;line-height:1;text-align:center">' + dayNames[idx] + '<br><span style="font-size:16px">' + dayDate.getDate() + '</span></div>' +
+            '</div>' +
+            '<div class="list-item-icon" style="background:' + (d.nilDefect ? 'var(--success-bg)' : 'var(--warning-bg)') + ';color:' + (d.nilDefect ? 'var(--success)' : 'var(--warning)') + ';flex-shrink:0">' +
+              '<span class="material-icons-round">' + (d.type === 'trailer-check' ? 'rv_hookup' : d.nilDefect ? 'check_circle' : 'report_problem') + '</span>' +
+            '</div>' +
+            '<div class="list-item-content" style="flex:1">' +
+              '<div class="list-item-title">' + (d.type === 'trailer-check' ? 'Trailer Check' : d.type === 'walkaround' ? 'Walkaround' : (d.category || 'Defect')) + (d.time ? ' at ' + d.time : '') + '</div>' +
+              '<div class="list-item-subtitle">' + (App.getDriver(d.driverId)?.name || 'Unknown') + ' · ' + (d.nilDefect ? 'Nil Defect' : (d.items ? d.items.filter(i => i.status === 'fail').length : 0) + ' defect(s)') +
+              (d.cornerPhotos && Object.keys(d.cornerPhotos).length > 0 ? ' · 📸 Photos' : '') + '</div>' +
+            '</div>' +
+            '<span class="material-icons-round" style="color:var(--text-muted);font-size:20px;flex-shrink:0">chevron_right</span>' +
+          '</div>';
+        });
+      }
+    });
+
+    resDiv.innerHTML =
+      '<div class="stats-row" style="grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: var(--space-md)">' +
+        '<div class="stat-card" style="padding:12px"><div class="stat-value text-accent" style="font-size:18px">' + totalChecks + '</div><div class="stat-label">Walkarounds</div></div>' +
+        '<div class="stat-card" style="padding:12px"><div class="stat-value text-success" style="font-size:18px">' + nilCount + '</div><div class="stat-label">Nil Defect</div></div>' +
+        '<div class="stat-card" style="padding:12px"><div class="stat-value text-warning" style="font-size:18px">' + totalDefects + '</div><div class="stat-label">Defects</div></div>' +
+        '<div class="stat-card" style="padding:12px"><div class="stat-value text-info" style="font-size:18px">' + photosCount + '</div><div class="stat-label">With Photos</div></div>' +
+      '</div>' +
+      '<div class="list-card mt-md">' +
+        (weekDefects.length === 0 ? '<div class="empty-state" style="padding:var(--space-lg) 0"><span class="material-icons-round">event_busy</span><h3>No records this week</h3><p>No walkaround checks or defects for ' + vehicleReg + ' in this period</p></div>' : daysHtml) +
+      '</div>';
+
+    // Bind click handlers for the new rows
+    resDiv.querySelectorAll('[data-action="open-defect"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.openDefectDetail(parseInt(btn.dataset.defectId));
+      });
+    });
+  },
+
+  openDefectDetail(defectId) {
+    const d = App.data.defects.find(x => x.id === defectId);
+    if (!d) return;
+    const driver = App.getDriver(d.driverId);
+    const isWalkaround = d.type === 'walkaround';
+    const isTrailerCheck = d.type === 'trailer-check';
+    const hasPhotos = d.cornerPhotos && Object.keys(d.cornerPhotos).length > 0;
+    const defectCount = d.items ? d.items.filter(i => i.status === 'fail').length : 0;
+    const typeLabel = isTrailerCheck ? 'Trailer Inspection' : isWalkaround ? 'Walkaround Check' : 'Defect Report';
+
+    let defectItemsHtml = '';
+    if (d.items && d.items.length > 0) {
+      const failed = d.items.filter(i => i.status === 'fail');
+      if (failed.length > 0) {
+        defectItemsHtml = `
+          <div style="margin-top:var(--space-md);padding:var(--space-md);background:var(--warning-bg);border-radius:8px">
+            <div style="font-weight:600;color:var(--warning);margin-bottom:8px;display:flex;align-items:center;gap:6px">
+              <span class="material-icons-round" style="font-size:18px">warning</span>${failed.length} Defect${failed.length!==1?'s':''} Found
+            </div>
+            ${failed.map(i => `
+              <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
+                <div style="font-weight:600;font-size:var(--text-sm);color:var(--text-main)">${i.label}</div>
+                ${i.notes ? '<div style="font-size:var(--text-sm);color:var(--text-secondary);margin-top:2px">' + i.notes + '</div>' : '<div style="font-size:var(--text-sm);color:var(--text-muted);margin-top:2px">No description</div>'}
+              </div>
+            `).join('')}
+          </div>`;
+      }
+    }
+
+    // For legacy single-defect types
+    if (!isWalkaround && !isTrailerCheck && d.description) {
+      defectItemsHtml = `
+        <div style="margin-top:var(--space-md);padding:var(--space-md);background:var(--warning-bg);border-radius:8px">
+          <div style="font-weight:600;color:var(--warning);margin-bottom:8px">Defect Details</div>
+          <div style="font-size:var(--text-sm);color:var(--text-secondary)">${d.description}</div>
+        </div>`;
+    }
+
+    let photosHtml = '';
+    if (hasPhotos) {
+      const corners = [
+        { key: 'front', label: 'Front' },
+        { key: 'nearside', label: 'Nearside (Driver)' },
+        { key: 'offside', label: 'Offside (Passenger)' },
+        { key: 'rear', label: 'Rear' },
+      ];
+      photosHtml = `
+        <div style="margin-top:var(--space-lg)">
+          <div style="font-weight:700;font-size:var(--text-sm);color:var(--text-main);margin-bottom:12px;display:flex;align-items:center;gap:6px">
+            <span class="material-icons-round" style="font-size:18px;color:var(--info)">photo_camera</span>Vehicle Corner Photos
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            ${corners.map(c => `
+              <div style="text-align:center">
+                ${d.cornerPhotos[c.key]
+                  ? '<img src="' + d.cornerPhotos[c.key] + '" alt="' + c.label + '" style="width:100%;border-radius:8px;border:1px solid rgba(255,255,255,0.1);aspect-ratio:4/3;object-fit:cover;cursor:pointer" onclick="window.open(this.src)" />'
+                  : '<div style="padding:40px;background:rgba(255,255,255,0.04);border-radius:8px;color:var(--text-muted)"><span class="material-icons-round">no_photography</span></div>'}
+                <div style="font-size:var(--text-sm);font-weight:600;margin-top:6px;color:var(--text-secondary)">${c.label}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>`;
+    }
+
+    // Has actual defects to resolve (not nil defect)?
+    const needsResolution = !d.nilDefect && d.status === 'reported';
+    const isResolved = d.status === 'resolved' && !d.nilDefect;
+
+    // Workshop sign-off section
+    let workshopHtml = '';
+    if (needsResolution) {
+      workshopHtml = `
+        <div style="margin-top:var(--space-lg);padding:var(--space-md);border:2px solid var(--warning);border-radius:12px;background:rgba(245,124,0,0.05)">
+          <div style="font-weight:700;color:var(--warning);margin-bottom:12px;display:flex;align-items:center;gap:8px;font-size:var(--text-base)">
+            <span class="material-icons-round" style="font-size:22px">build</span>Workshop Sign-Off Required
+          </div>
+          <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:var(--space-md)">A workshop technician must confirm this defect has been inspected and resolved before sign-off.</p>
+          <div class="form-group">
+            <label style="font-weight:600;font-size:var(--text-sm)">Workshop Staff Name (Print)</label>
+            <input type="text" class="form-input" id="ws-print-name" placeholder="e.g. Dave Williams" />
+          </div>
+          <div class="form-group">
+            <label style="font-weight:600;font-size:var(--text-sm)">Workshop Signature</label>
+            <input type="text" class="form-input" id="ws-signature" placeholder="Type full name as signature" />
+          </div>
+          <div class="form-group">
+            <label style="font-weight:600;font-size:var(--text-sm)">Work Carried Out / Notes</label>
+            <textarea class="form-input" id="ws-notes" placeholder="Describe what was done to resolve the defect(s)..."></textarea>
+          </div>
+          <button class="btn btn-success btn-full" id="btn-ws-resolve" style="margin-top:var(--space-sm)">
+            <span class="material-icons-round">check_circle</span>Confirm Defect Resolved
+          </button>
+        </div>`;
+    } else if (isResolved && d.workshopSignOff) {
+      workshopHtml = `
+        <div style="margin-top:var(--space-lg);padding:var(--space-md);border:2px solid var(--success);border-radius:12px;background:rgba(0,200,83,0.05)">
+          <div style="font-weight:700;color:var(--success);margin-bottom:12px;display:flex;align-items:center;gap:8px;font-size:var(--text-base)">
+            <span class="material-icons-round" style="font-size:22px">verified</span>Workshop Sign-Off Complete
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+            <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:12px">
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Technician Name</div>
+              <div style="font-weight:600;margin-top:4px">${d.workshopSignOff.printName}</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:12px">
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Signature</div>
+              <div style="font-weight:600;margin-top:4px">${d.workshopSignOff.signature}</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:12px">
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Resolved Date</div>
+              <div style="font-weight:600;margin-top:4px">${d.workshopSignOff.date}${d.workshopSignOff.time ? ' at '+d.workshopSignOff.time : ''}</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:12px">
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Reported To</div>
+              <div style="font-weight:600;margin-top:4px">${d.reportedTo || '—'}</div>
+            </div>
+          </div>
+          ${d.workshopSignOff.notes ? '<div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:12px"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Work Carried Out</div><div style="font-size:var(--text-sm);color:var(--text-secondary)">' + d.workshopSignOff.notes + '</div></div>' : ''}
+        </div>`;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal" style="max-width:640px;max-height:90vh;overflow-y:auto">
+        <div class="modal-header">
+          <span class="modal-title">${typeLabel}</span>
+          <button class="modal-close" id="close-modal"><span class="material-icons-round">close</span></button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:var(--space-md)">
+          <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:12px">
+            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Driver</div>
+            <div style="font-weight:600;margin-top:4px">${driver?.name || 'Unknown'}</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:12px">
+            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Date / Time</div>
+            <div style="font-weight:600;margin-top:4px">${d.date}${d.time ? ' at '+d.time : ''}</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:12px">
+            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Vehicle</div>
+            <div style="font-weight:600;margin-top:4px">${d.vehicle || 'N/A'}</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:12px">
+            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">${isTrailerCheck ? 'Trailer' : 'Trailer / Odo'}</div>
+            <div style="font-weight:600;margin-top:4px">${d.trailer || '—'}${d.odometer ? ' · Odo: '+d.odometer : ''}</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:6px;margin-bottom:var(--space-md);flex-wrap:wrap">
+          <span class="badge badge-${d.nilDefect?'success':d.status==='resolved'?'success':'warning'}" style="font-size:12px;padding:6px 12px">${d.nilDefect ? '✅ Nil Defect — All Clear' : d.status === 'resolved' ? '✅ Resolved' : (isWalkaround||isTrailerCheck) ? '⚠️ '+defectCount+' Defect'+(defectCount!==1?'s':'')+' — Awaiting Workshop' : d.status}</span>
+          ${d.severity ? '<span class="badge badge-' + (d.severity==='high'?'danger':d.severity==='medium'?'warning':'info') + '" style="font-size:12px;padding:6px 12px">' + d.severity + ' severity</span>' : ''}
+          ${hasPhotos ? '<span class="badge badge-info" style="font-size:12px;padding:6px 12px"><span class="material-icons-round" style="font-size:14px;vertical-align:middle;margin-right:4px">photo_camera</span>4 Corner Photos</span>' : ''}
+        </div>
+
+        ${defectItemsHtml}
+
+        ${d.additionalNotes ? '<div style="margin-top:var(--space-md);padding:var(--space-md);background:rgba(255,255,255,0.04);border-radius:8px"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Additional Notes</div><div style="font-size:var(--text-sm);color:var(--text-secondary)">' + d.additionalNotes + '</div></div>' : ''}
+
+        ${(d.signature || d.reportedTo) ? '<div style="margin-top:var(--space-md);display:flex;gap:12px"><div style="flex:1;background:rgba(255,255,255,0.04);border-radius:8px;padding:12px"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Driver Signed</div><div style="font-weight:600;margin-top:4px">' + (d.signature||'—') + '</div></div><div style="flex:1;background:' + (needsResolution ? 'rgba(245,124,0,0.1);border:1px solid var(--warning)' : 'rgba(255,255,255,0.04)') + ';border-radius:8px;padding:12px"><div style="font-size:11px;color:' + (needsResolution ? 'var(--warning)' : 'var(--text-muted)') + ';text-transform:uppercase;letter-spacing:0.5px;font-weight:' + (needsResolution ? '700' : '400') + '">Reported To</div><div style="font-weight:600;margin-top:4px">' + (d.reportedTo||'—') + '</div></div></div>' : ''}
+
+        ${workshopHtml}
+
+        ${photosHtml}
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#close-modal').addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+    // Bind workshop resolve button
+    overlay.querySelector('#btn-ws-resolve')?.addEventListener('click', () => {
+      const printName = overlay.querySelector('#ws-print-name').value.trim();
+      const signature = overlay.querySelector('#ws-signature').value.trim();
+      const notes = overlay.querySelector('#ws-notes').value.trim();
+
+      if (!printName) { App.toast('Please enter the technician\'s printed name', 'error'); return; }
+      if (!signature) { App.toast('Please enter the technician\'s signature', 'error'); return; }
+      if (!notes) { App.toast('Please describe the work carried out', 'error'); return; }
+
+      d.status = 'resolved';
+      d.workshopSignOff = {
+        printName,
+        signature,
+        notes,
+        date: App.todayStr(),
+        time: new Date().toTimeString().slice(0, 5),
+      };
+      App.saveData('defects');
+      overlay.remove();
+      App.toast('Defect marked as resolved with workshop sign-off!', 'success');
+      App.render();
+    });
   },
 
   // --- PODs View ---
