@@ -537,7 +537,7 @@ const AdminScreens = {
       </div>
       <div class="list-item-content" style="flex:1;min-width:150px">
         <div class="list-item-title">${typeLabel} — ${d.vehicle || 'N/A'} ${d.trailer ? '· Trl: '+d.trailer : ''}</div>
-        <div class="list-item-subtitle">${driver?.name || 'Unknown'} · ${d.date}${d.time ? ' at '+d.time : ''}</div>
+        <div class="list-item-subtitle">${driver?.name || 'Unknown'} · ${d.date}${d.time ? ' at '+d.time : ''}${d.odometer ? ' · ' + d.odometer + ' mi' : ''}</div>
         <div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap">
           <span class="badge badge-${d.nilDefect?'success':d.status==='resolved'?'success':'warning'}" style="font-size:11px">${d.nilDefect ? 'Nil Defect' : (isWalkaround||isTrailerCheck) ? defectCount + ' defect' + (defectCount!==1?'s':'') : d.status}</span>
           ${hasPhotos ? '<span class="badge badge-info" style="font-size:11px"><span class="material-icons-round" style="font-size:12px;vertical-align:middle;margin-right:2px">photo_camera</span>4 Photos</span>' : ''}
@@ -606,6 +606,7 @@ const AdminScreens = {
             '<div class="list-item-content" style="flex:1">' +
               '<div class="list-item-title">' + (d.type === 'trailer-check' ? 'Trailer Check' : d.type === 'walkaround' ? 'Walkaround' : (d.category || 'Defect')) + (d.time ? ' at ' + d.time : '') + '</div>' +
               '<div class="list-item-subtitle">' + (App.getDriver(d.driverId)?.name || 'Unknown') + ' · ' + (d.nilDefect ? 'Nil Defect' : (d.items ? d.items.filter(i => i.status === 'fail').length : 0) + ' defect(s)') +
+              (d.odometer ? ' · ' + d.odometer + ' mi' : '') +
               (d.cornerPhotos && Object.keys(d.cornerPhotos).length > 0 ? ' · 📸 Photos' : '') + '</div>' +
             '</div>' +
             '<span class="material-icons-round" style="color:var(--text-muted);font-size:20px;flex-shrink:0">chevron_right</span>' +
@@ -763,7 +764,7 @@ const AdminScreens = {
           <button class="modal-close" id="close-modal"><span class="material-icons-round">close</span></button>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:var(--space-md)">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:var(--space-md)">
           <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:12px">
             <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Driver</div>
             <div style="font-weight:600;margin-top:4px">${driver?.name || 'Unknown'}</div>
@@ -779,6 +780,14 @@ const AdminScreens = {
           <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:12px">
             <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">${isTrailerCheck ? 'Trailer' : 'Trailer / Odo'}</div>
             <div style="font-weight:600;margin-top:4px">${d.trailer || '—'}${d.odometer ? ' · Odo: '+d.odometer : ''}</div>
+          </div>
+          <div style="background:rgba(0,176,255,0.08);border-radius:8px;padding:12px;border:1px solid rgba(0,176,255,0.15)">
+            <div style="font-size:11px;color:var(--info);text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Odometer (Miles)</div>
+            <div style="font-weight:700;margin-top:4px;font-size:16px;color:var(--info)">${d.odometer || '—'}</div>
+          </div>
+          <div style="background:rgba(0,200,83,0.08);border-radius:8px;padding:12px;border:1px solid rgba(0,200,83,0.15)">
+            <div style="font-size:11px;color:var(--success);text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Driver Height</div>
+            <div style="font-weight:700;margin-top:4px;font-size:16px;color:var(--success)">${d.driverHeight || '—'}</div>
           </div>
         </div>
 

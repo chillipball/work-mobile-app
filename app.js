@@ -532,6 +532,7 @@ const App = {
           ${defectItems.length > 0 ? `<div class="divider"></div>${defectItems.map(di => `
             <div style="padding:var(--space-sm) 0"><strong>${di.label}</strong><p style="color:var(--text-secondary);font-size:var(--text-sm)">${di.notes||'No details'}</p></div>
           `).join('')}` : ''}
+          <div style="font-size:var(--text-sm);color:var(--text-secondary);margin-top:8px"><strong>Odometer:</strong> ${todayCheck.odometer || '—'} mi${todayCheck.driverHeight ? ' · <strong>Height:</strong> ' + todayCheck.driverHeight : ''}</div>
           ${todayCheck.additionalNotes ? `<div class="divider"></div><p style="font-size:var(--text-sm);color:var(--text-secondary)"><strong>Notes:</strong> ${todayCheck.additionalNotes}</p>` : ''}
           ${todayCheck.cornerPhotos && Object.keys(todayCheck.cornerPhotos).length > 0 ? `
             <div class="divider"></div>
@@ -565,15 +566,45 @@ const App = {
       <div class="card mb-lg">
         <div class="form-row">
           <div class="form-group">
-            <label>Tractor Unit</label>
+            <label>Tractor Unit <span style="color:var(--danger)">*</span></label>
             <input type="text" list="vehicle-list" class="form-input" id="wa-vehicle" value="${this.state.user?.vehicle||''}" placeholder="e.g. AB12 CDE" autocomplete="off" />
             <datalist id="vehicle-list">
-              ${this.data.vehicles.map(v => `<option value="${v.reg}">${v.type}</option>`).join('')}
+              ${this.data.vehicles.filter(v => v.status !== 'removed').map(v => `<option value="${v.reg}">${v.type}</option>`).join('')}
             </datalist>
           </div>
           <div class="form-group"><label>Trailer ID</label><input type="text" class="form-input" id="wa-trailer" value="${this.state.user?.trailer||''}" placeholder="e.g. TR-240" /></div>
         </div>
-        <div class="form-group"><label>Odometer Reading</label><input type="number" class="form-input" id="wa-odometer" placeholder="e.g. 245891" inputmode="numeric" /></div>
+        <div class="form-group"><label>Odometer Reading <span style="color:var(--danger)">*</span></label><input type="number" class="form-input" id="wa-odometer" placeholder="e.g. 245891" inputmode="numeric" /></div>
+      </div>
+      <div class="card mb-lg" style="border-left:3px solid var(--info)">
+        <div class="card-header">
+          <span class="card-title"><span class="material-icons-round" style="font-size:20px;vertical-align:middle;margin-right:6px">height</span>Driver Height Check</span>
+          <span class="badge badge-danger">Required</span>
+        </div>
+        <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:var(--space-md)">Enter your height as shown on your medical/licence records.</p>
+        <div style="display:flex;gap:16px;align-items:flex-end">
+          <div class="form-group" style="flex:1;margin-bottom:0">
+            <label style="font-weight:600;font-size:var(--text-sm)">Feet <span style="color:var(--danger)">*</span></label>
+            <select class="form-select" id="wa-height-ft" style="font-size:18px;text-align:center;padding:12px;-webkit-appearance:none">
+              <option value="">--</option>
+              <option value="4">4 ft</option>
+              <option value="5">5 ft</option>
+              <option value="6">6 ft</option>
+              <option value="7">7 ft</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:1;margin-bottom:0">
+            <label style="font-weight:600;font-size:var(--text-sm)">Inches <span style="color:var(--danger)">*</span></label>
+            <select class="form-select" id="wa-height-in" style="font-size:18px;text-align:center;padding:12px;-webkit-appearance:none">
+              <option value="">--</option>
+              ${Array.from({length:12}, (_,i) => '<option value="'+i+'">'+i+' in</option>').join('')}
+            </select>
+          </div>
+          <div style="flex:1;text-align:center;padding-bottom:4px">
+            <div id="wa-height-display" style="font-size:24px;font-weight:800;color:var(--accent);line-height:1">—</div>
+            <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:4px">Your Height</div>
+          </div>
+        </div>
       </div>
       <div class="section-header"><span class="section-title">Daily Check</span><span class="section-title" style="font-size:var(--text-xs)">✓ Tick if applicable</span></div>
       <div class="list-card mb-lg">
@@ -629,7 +660,7 @@ const App = {
         <div class="form-group"><label>Record any defects or irregular circumstances</label><textarea class="form-input" id="wa-additional" placeholder="Write 'None' if no defects..."></textarea></div>
         <div class="form-row">
           <div class="form-group"><label>Reported To</label><input type="text" class="form-input" id="wa-reported-to" placeholder="e.g. Office / Workshop" /></div>
-          <div class="form-group"><label>Driver's Signature</label><input type="text" class="form-input" id="wa-signature" placeholder="Type your full name" /></div>
+          <div class="form-group"><label>Driver's Signature <span style="color:var(--danger)">*</span></label><input type="text" class="form-input" id="wa-signature" placeholder="Type your full name" /></div>
         </div>
       </div>
       <button class="btn btn-primary btn-full mb-lg" id="btn-submit-walkaround"><span class="material-icons-round">check_circle</span>Submit Walkaround Check</button>
@@ -961,16 +992,34 @@ const App = {
       });
     });
 
+    // Height check live display
+    const updateHeightDisplay = () => {
+      const ft = document.getElementById('wa-height-ft')?.value;
+      const inches = document.getElementById('wa-height-in')?.value;
+      const display = document.getElementById('wa-height-display');
+      if (display) {
+        display.textContent = (ft && inches !== '') ? ft + "'" + inches + '"' : '—';
+      }
+    };
+    document.getElementById('wa-height-ft')?.addEventListener('change', updateHeightDisplay);
+    document.getElementById('wa-height-in')?.addEventListener('change', updateHeightDisplay);
+
     document.getElementById('btn-submit-walkaround')?.addEventListener('click', () => {
       const isNil = document.getElementById('wa-nil-defect').checked;
-      const vehicle = document.getElementById('wa-vehicle').value;
-      const trailer = document.getElementById('wa-trailer').value;
-      const odometer = document.getElementById('wa-odometer').value;
+      const vehicle = document.getElementById('wa-vehicle').value.trim();
+      const trailer = document.getElementById('wa-trailer').value.trim();
+      const odometer = document.getElementById('wa-odometer').value.trim();
       const additional = document.getElementById('wa-additional').value;
       const reportedTo = document.getElementById('wa-reported-to').value;
-      const signature = document.getElementById('wa-signature').value;
+      const signature = document.getElementById('wa-signature').value.trim();
+      const heightFt = document.getElementById('wa-height-ft')?.value;
+      const heightIn = document.getElementById('wa-height-in')?.value;
 
-      if (!vehicle || !signature) { this.toast('Tractor Unit and Signature are required', 'error'); return; }
+      // Mandatory field validation
+      if (!vehicle) { this.toast('Registration (Tractor Unit) is required', 'error'); document.getElementById('wa-vehicle')?.focus(); return; }
+      if (!odometer) { this.toast('Odometer reading is required', 'error'); document.getElementById('wa-odometer')?.focus(); return; }
+      if (!heightFt || heightIn === '') { this.toast('Driver height is required — select feet and inches', 'error'); document.getElementById('wa-height-ft')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+      if (!signature) { this.toast('Driver signature is required', 'error'); document.getElementById('wa-signature')?.focus(); return; }
 
       // Require all 4 corner photos
       const requiredCorners = ['front', 'nearside', 'offside', 'rear'];
@@ -994,10 +1043,11 @@ const App = {
       if (!isNil && failedItems.length === 0) { this.toast('Select defects or tick NIL DEFECT', 'error'); return; }
       if (missingNotes) { this.toast('Please describe all selected defects', 'error'); return; }
 
+      const driverHeight = heightFt + "'" + heightIn + '"';
       const check = {
         id: Date.now(), driverId: this.state.user.id, type: 'walkaround', vehicle, trailer,
         date: this.todayStr(), time: new Date().toTimeString().slice(0,5),
-        odometer, nilDefect: isNil, items: failedItems,
+        odometer, driverHeight, nilDefect: isNil, items: failedItems,
         additionalNotes: additional, reportedTo, signature,
         cornerPhotos: { ...this.state.cornerPhotos }, // Save all 4 corner photos
         status: isNil ? 'resolved' : 'reported'
