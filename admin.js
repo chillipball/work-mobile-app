@@ -222,6 +222,13 @@ const AdminScreens = {
     document.querySelectorAll('[data-remove-vehicle]').forEach(btn => {
       btn.addEventListener('click', (e) => { e.stopPropagation(); this.removeVehicle(btn.dataset.removeVehicle); });
     });
+    // Timesheet Approval - Event Delegation for dynamically rendered buttons
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-action="approve-timesheet"]');
+      if (btn) {
+        this.approveTimesheet(parseInt(btn.dataset.id));
+      }
+    });
   },
 
   // --- Admin Dashboard ---
@@ -421,7 +428,7 @@ const AdminScreens = {
       <p class="screen-subtitle">Review and approve driver timesheets</p>
       <div class="card" style="overflow-x:auto">
         <table class="data-table" style="min-width: 800px">
-          <thead><tr><th>Driver</th><th>Date</th><th>Start</th><th>End</th><th>Duration / Breaks</th><th>Mileage</th><th>Fuel / AdBlue</th><th>Night Out</th><th>Status</th></tr></thead>
+          <thead><tr><th>Driver</th><th>Date</th><th>Start</th><th>End</th><th>Duration / Breaks</th><th>Mileage</th><th>Fuel / AdBlue</th><th>Night Out</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody>
             ${App.data.timesheets.map(t => {
               const d = App.getDriver(t.driverId);
@@ -443,15 +450,27 @@ const AdminScreens = {
                 <td>${t.start}</td>
                 <td>${t.end || '—'}</td>
                 <td>${durationStr}<br><span style="font-size:10px;color:var(--text-muted)">Breaks: ${t.breaks}m</span></td>
-                <td>${t.mileage}mi</td>
+                <td>${t.mileage || '—'}${t.mileage ? 'mi' : ''}</td>
                 <td><div style="line-height:1.2">${fuelStr}<br>${adbStr !== '—' ? adbStr : ''}</div></td>
                 <td><div style="line-height:1.2">${noStr}</div></td>
                 <td><span class="badge badge-${t.status==='approved'?'success':t.status==='active'?'warning':'info'}">${t.status}</span></td>
+                <td>
+                  ${t.status === 'submitted' ? `<button class="btn btn-sm btn-success" data-action="approve-timesheet" data-id="${t.id}" style="padding:4px 8px"><span class="material-icons-round" style="font-size:14px;margin-right:4px">check</span>Approve</button>` : '—'}
+                </td>
               </tr>`;
             }).join('')}
           </tbody>
         </table>
       </div>`;
+  },
+
+  approveTimesheet(id) {
+    const ts = App.data.timesheets.find(t => t.id === id);
+    if (!ts) return;
+    ts.status = 'approved';
+    App.saveData('timesheets');
+    App.toast('Timesheet approved!', 'success');
+    App.render();
   },
 
   // --- Weekly Summary View ---
