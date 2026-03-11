@@ -584,22 +584,18 @@ const App = {
         <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:var(--space-md)">Enter the vehicle height as displayed on the cab plate.</p>
         <div style="display:flex;gap:16px;align-items:flex-end">
           <div class="form-group" style="flex:1;margin-bottom:0">
-            <label style="font-weight:600;font-size:var(--text-sm)">Feet <span style="color:var(--danger)">*</span></label>
-            <select class="form-select" id="wa-height-ft" style="font-size:18px;text-align:center;padding:12px;-webkit-appearance:none">
-              <option value="">--</option>
-              ${Array.from({length:11}, (_,i) => '<option value="'+(i+6)+'">'+(i+6)+' ft</option>').join('')}
+            <label style="font-weight:600;font-size:var(--text-sm)">Height (Ft & In) <span style="color:var(--danger)">*</span></label>
+            <select class="form-select" id="wa-height-combined" style="font-size:16px;text-align:center;padding:12px;-webkit-appearance:none;direction:ltr">
+              <option value="">-- Select Height --</option>
+              ${Array.from({length: 11}, (_, f) => {
+                const ft = f + 6;
+                return Array.from({length: 12}, (_, i) => `<option value="${ft}'${i}\"">${ft} ft ${i} in</option>`).join('');
+              }).join('')}
             </select>
           </div>
-          <div class="form-group" style="flex:1;margin-bottom:0">
-            <label style="font-weight:600;font-size:var(--text-sm)">Inches <span style="color:var(--danger)">*</span></label>
-            <select class="form-select" id="wa-height-in" style="font-size:18px;text-align:center;padding:12px;-webkit-appearance:none">
-              <option value="">--</option>
-              ${Array.from({length:12}, (_,i) => '<option value="'+i+'">'+i+' in</option>').join('')}
-            </select>
-          </div>
-          <div style="flex:1;text-align:center;padding-bottom:4px">
+          <div style="text-align:center;padding-bottom:6px;min-width:80px">
             <div id="wa-height-display" style="font-size:24px;font-weight:800;color:var(--accent);line-height:1">—</div>
-            <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:4px">Your Height</div>
+            <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:4px">Selected</div>
           </div>
         </div>
       </div>
@@ -991,15 +987,13 @@ const App = {
 
     // Height check live display
     const updateHeightDisplay = () => {
-      const ft = document.getElementById('wa-height-ft')?.value;
-      const inches = document.getElementById('wa-height-in')?.value;
+      const val = document.getElementById('wa-height-combined')?.value;
       const display = document.getElementById('wa-height-display');
       if (display) {
-        display.textContent = (ft && inches !== '') ? ft + "'" + inches + '"' : '—';
+        display.textContent = val ? val : '—';
       }
     };
-    document.getElementById('wa-height-ft')?.addEventListener('change', updateHeightDisplay);
-    document.getElementById('wa-height-in')?.addEventListener('change', updateHeightDisplay);
+    document.getElementById('wa-height-combined')?.addEventListener('change', updateHeightDisplay);
 
     document.getElementById('btn-submit-walkaround')?.addEventListener('click', () => {
       const isNil = document.getElementById('wa-nil-defect').checked;
@@ -1009,13 +1003,12 @@ const App = {
       const additional = document.getElementById('wa-additional').value;
       const reportedTo = document.getElementById('wa-reported-to').value;
       const signature = document.getElementById('wa-signature').value.trim();
-      const heightFt = document.getElementById('wa-height-ft')?.value;
-      const heightIn = document.getElementById('wa-height-in')?.value;
+      const vehicleHeight = document.getElementById('wa-height-combined')?.value;
 
       // Mandatory field validation
       if (!vehicle) { this.toast('Registration (Tractor Unit) is required', 'error'); document.getElementById('wa-vehicle')?.focus(); return; }
       if (!odometer) { this.toast('Odometer reading is required', 'error'); document.getElementById('wa-odometer')?.focus(); return; }
-      if (!heightFt || heightIn === '') { this.toast('Vehicle height is required — select feet and inches', 'error'); document.getElementById('wa-height-ft')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+      if (!vehicleHeight) { this.toast('Vehicle height is required — please select the height', 'error'); document.getElementById('wa-height-combined')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
       if (!signature) { this.toast('Driver signature is required', 'error'); document.getElementById('wa-signature')?.focus(); return; }
 
       // Require all 4 corner photos
@@ -1040,7 +1033,6 @@ const App = {
       if (!isNil && failedItems.length === 0) { this.toast('Select defects or tick NIL DEFECT', 'error'); return; }
       if (missingNotes) { this.toast('Please describe all selected defects', 'error'); return; }
 
-      const vehicleHeight = heightFt + "'" + heightIn + '"';
       const check = {
         id: Date.now(), driverId: this.state.user.id, type: 'walkaround', vehicle, trailer,
         date: this.todayStr(), time: new Date().toTimeString().slice(0,5),

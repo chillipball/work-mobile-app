@@ -3,6 +3,70 @@
    ============================================================ */
 
 const AdminScreens = {
+  getNotifications() {
+    let notifs = [];
+    const today = App.todayStr();
+
+    // 1. Unresolved defects from any day (High priority)
+    const unresolvedDefects = (App.data.defects || []).filter(d => d.status === 'reported' && !d.nilDefect);
+    unresolvedDefects.forEach(d => {
+      const driverName = App.getDriver(d.driverId)?.name || 'Unknown';
+      notifs.push({
+        type: d.severity==='high'?'danger':d.severity==='medium'?'warning':'info',
+        icon: 'report_problem',
+        text: `<strong>${driverName}</strong> reported a defect on <strong>${d.vehicle}</strong> (Needs Sign-Off)`,
+        time: `${d.date} ${d.time}`,
+        link: 'admin-defects',
+        ts: new Date(`${d.date}T${d.time||'00:00'}`).getTime() || 0
+      });
+    });
+
+    // 2. Today's Walkarounds
+    const todaysWalkarounds = (App.data.defects || []).filter(d => (d.type === 'walkaround' || d.type === 'trailer-check') && d.date === today && d.status !== 'reported');
+    todaysWalkarounds.forEach(d => {
+      const driverName = App.getDriver(d.driverId)?.name || 'Unknown';
+      notifs.push({
+        type: 'success',
+        icon: d.nilDefect ? 'check_circle' : 'done_all',
+        text: `<strong>${driverName}</strong> submitted a check for <strong>${d.vehicle || d.trailer}</strong> (${d.nilDefect ? 'Nil Defect' : 'Walkaround'})`,
+        time: `${d.time || 'Today'}`,
+        link: 'admin-defects',
+        ts: new Date(`${d.date}T${d.time||'00:00'}`).getTime() || 0
+      });
+    });
+
+    // 3. Today's Timesheets
+    const todaysTimesheets = (App.data.timesheets || []).filter(t => t.date === today);
+    todaysTimesheets.forEach(t => {
+      const driverName = App.getDriver(t.driverId)?.name || 'Unknown';
+      notifs.push({
+        type: 'primary',
+        icon: 'schedule',
+        text: `<strong>${driverName}</strong> signed off their timesheet`,
+        time: `${t.startTime || ''} - ${t.endTime || ''}`,
+        link: 'admin-timesheets',
+        ts: new Date(`${t.date}T${t.endTime||'23:59'}`).getTime() || 0
+      });
+    });
+
+    // 4. Today's PODs
+    const todaysPods = (App.data.pods || []).filter(p => p.date === today);
+    todaysPods.forEach(p => {
+      const driverName = App.getDriver(p.driverId)?.name || 'Unknown';
+      notifs.push({
+        type: 'info',
+        icon: 'inventory',
+        text: `<strong>${driverName}</strong> uploaded a POD for <strong>${p.recipient}</strong>`,
+        time: `${p.time || 'Today'}`,
+        link: 'admin-pods',
+        ts: new Date(`${p.date}T${p.time||'23:59'}`).getTime() || 0
+      });
+    });
+
+    // Sort by timestamp descending
+    return notifs.sort((a, b) => b.ts - a.ts);
+  },
+
   renderShell() {
     const s = App.state.currentScreen;
     const u = App.state.user;
@@ -18,6 +82,8 @@ const AdminScreens = {
       { id: 'admin-export', icon: 'download', label: 'Export Data' },
     ];
     let screenContent = '';
+    const notifs = this.getNotifications();
+    
     if (s === 'admin-dashboard') screenContent = this.renderDashboard();
     else if (s === 'admin-drivers') screenContent = this.renderDrivers();
     else if (s === 'admin-vehicles') screenContent = this.renderVehicles();
@@ -54,9 +120,36 @@ const AdminScreens = {
             <span class="header-brand">G. & M. Hartshorne <span>Office</span></span>
           </div>
           <div class="header-center"></div>
-          <div class="header-right">
-            <span style="color:var(--text-secondary);font-size:var(--text-sm)">${u.name}</span>
-            <div class="header-avatar">${u.name.charAt(0)}</div>
+          <div class="header-right" style="position:relative;display:flex;align-items:center;gap:12px">
+            <button class="btn btn-icon" id="admin-notifications-btn" style="position:relative;background:rgba(255,255,255,0.05);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--text-main);border:none;cursor:pointer;transition:background 0.2s" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">
+              <span class="material-icons-round">notifications</span>
+              ${notifs.length > 0 ? `<span style="position:absolute;top:-2px;right:-2px;background:var(--danger);color:#fff;font-size:10px;font-weight:700;padding:2px 5px;border-radius:10px;line-height:1">${notifs.length}</span>` : ''}
+            </button>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="color:var(--text-secondary);font-size:var(--text-sm);display:none;@media(min-width:768px){display:block}">${u.name}</span>
+              <div class="header-avatar" style="width:36px;height:36px;font-size:14px;background:var(--accent);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700">${u.name.charAt(0)}</div>
+            </div>
+            
+            <div id="admin-notifications-dropdown" class="hidden" style="position:absolute;top:48px;right:0;width:340px;background:var(--card-bg);border:1px solid rgba(255,255,255,0.08);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.5);z-index:100;overflow:hidden;text-align:left">
+              <div style="padding:16px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600;display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:var(--text-base)">Activity & Notifications</span>
+                ${notifs.length > 0 ? `<span class="badge badge-info" style="font-size:var(--text-xs)">${notifs.length} New</span>` : ''}
+              </div>
+              <div style="max-height:400px;overflow-y:auto">
+                ${notifs.length === 0 ? '<div style="padding:32px;text-align:center;color:var(--text-muted)"><span class="material-icons-round" style="font-size:32px;opacity:0.5;margin-bottom:8px">inbox</span><br>No new activity today</div>' : ''}
+                ${notifs.map(n => `
+                  <div class="list-item" data-action="admin-navigate" data-screen="${n.link}" style="cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.04);padding:12px 16px;background:transparent;transition:background 0.2s;align-items:start" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+                    <div class="list-item-icon" style="background:var(--${n.type}-bg);color:var(--${n.type});width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:12px;margin-top:2px">
+                      <span class="material-icons-round" style="font-size:18px">${n.icon}</span>
+                    </div>
+                    <div class="list-item-content" style="flex:1">
+                      <div class="list-item-title" style="font-size:13px;white-space:normal;line-height:1.4;margin-bottom:4px;color:var(--text-main)">${n.text}</div>
+                      <div class="list-item-subtitle" style="font-size:11px;color:var(--text-muted)">${n.time}</div>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
           </div>
         </header>
         <main class="main-content">
@@ -76,6 +169,26 @@ const AdminScreens = {
     document.querySelectorAll('[data-screen]').forEach(btn => {
       btn.addEventListener('click', () => App.navigate(btn.dataset.screen));
     });
+    
+    // Notifications dropdown logic
+    document.getElementById('admin-notifications-btn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('admin-notifications-dropdown')?.classList.toggle('hidden');
+    });
+    document.addEventListener('click', (e) => {
+      const btn = document.getElementById('admin-notifications-btn');
+      const dropdown = document.getElementById('admin-notifications-dropdown');
+      if (btn && dropdown && !btn.contains(e.target) && !dropdown.contains(e.target)) {
+        dropdown.classList.add('hidden');
+      }
+    });
+    document.querySelectorAll('[data-action="admin-navigate"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.getElementById('admin-notifications-dropdown')?.classList.add('hidden');
+        App.navigate(btn.dataset.screen);
+      });
+    });
+
     document.getElementById('admin-logout')?.addEventListener('click', () => App.logout());
     document.getElementById('btn-send-instruction')?.addEventListener('click', () => this.sendInstruction());
     document.getElementById('btn-export-csv')?.addEventListener('click', () => this.exportCSV());
