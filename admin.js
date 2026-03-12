@@ -130,7 +130,7 @@ const AdminScreens = {
               <div class="header-avatar" style="width:36px;height:36px;font-size:14px;background:var(--accent);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700">${u.name.charAt(0)}</div>
             </div>
             
-            <div id="admin-notifications-dropdown" class="hidden" style="position:absolute;top:48px;right:0;width:340px;background:var(--card-bg);border:1px solid rgba(255,255,255,0.08);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.5);z-index:100;overflow:hidden;text-align:left">
+            <div id="admin-notifications-dropdown" class="hidden" style="position:absolute;top:48px;right:0;width:340px;background:var(--bg-card);border:1px solid rgba(255,255,255,0.08);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.5);z-index:100;overflow:hidden;text-align:left">
               <div style="padding:16px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600;display:flex;justify-content:space-between;align-items:center">
                 <span style="font-size:var(--text-base)">Activity & Notifications</span>
                 ${notifs.length > 0 ? `<span class="badge badge-info" style="font-size:var(--text-xs)">${notifs.length} New</span>` : ''}
@@ -221,13 +221,6 @@ const AdminScreens = {
     document.getElementById('btn-add-vehicle')?.addEventListener('click', () => this.addVehicle());
     document.querySelectorAll('[data-remove-vehicle]').forEach(btn => {
       btn.addEventListener('click', (e) => { e.stopPropagation(); this.removeVehicle(btn.dataset.removeVehicle); });
-    });
-    // Timesheet Approval - Event Delegation for dynamically rendered buttons
-    document.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-action="approve-timesheet"]');
-      if (btn) {
-        this.approveTimesheet(parseInt(btn.dataset.id));
-      }
     });
   },
 
@@ -455,7 +448,7 @@ const AdminScreens = {
                 <td><div style="line-height:1.2">${noStr}</div></td>
                 <td><span class="badge badge-${t.status==='approved'?'success':t.status==='active'?'warning':'info'}">${t.status}</span></td>
                 <td>
-                  ${t.status === 'submitted' ? `<button class="btn btn-sm btn-success" data-action="approve-timesheet" data-id="${t.id}" style="padding:4px 8px"><span class="material-icons-round" style="font-size:14px;margin-right:4px">check</span>Approve</button>` : '—'}
+                  ${t.status === 'submitted' ? `<button class="btn btn-sm btn-success" onclick="AdminScreens.approveTimesheet(${t.id})" style="padding:4px 8px"><span class="material-icons-round" style="font-size:14px;margin-right:4px">check</span>Approve</button>` : '—'}
                 </td>
               </tr>`;
             }).join('')}
