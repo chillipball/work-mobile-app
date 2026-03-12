@@ -221,7 +221,7 @@ const App = {
     return `
     <header class="app-header">
       <div class="header-left">
-        <span class="material-icons-round" style="color:var(--accent);font-size:28px">local_shipping</span>
+        <span class="material-icons-round" style="color:var(--text-primary);font-size:28px">local_shipping</span>
         <span class="header-brand">GM<span>H</span></span>
       </div>
       <div class="header-center"><span class="header-title">${titles[s] || ''}</span></div>

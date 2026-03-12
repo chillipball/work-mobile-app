@@ -116,7 +116,7 @@ const AdminScreens = {
       <div class="admin-main">
         <header class="app-header">
           <div class="header-left">
-            <span class="material-icons-round" style="color:var(--accent);font-size:28px">local_shipping</span>
+            <span class="material-icons-round" style="color:var(--text-primary);font-size:28px">local_shipping</span>
             <span class="header-brand">G. & M. Hartshorne <span>Office</span></span>
           </div>
           <div class="header-center"></div>
@@ -127,7 +127,7 @@ const AdminScreens = {
             </button>
             <div style="display:flex;align-items:center;gap:8px">
               <span style="color:var(--text-secondary);font-size:var(--text-sm);display:none;@media(min-width:768px){display:block}">${u.name}</span>
-              <div class="header-avatar" style="width:36px;height:36px;font-size:14px;background:var(--accent);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700">${u.name.charAt(0)}</div>
+              <div class="header-avatar" style="width:36px;height:36px;font-size:14px;background:linear-gradient(135deg,var(--primary) 0%,var(--primary-light) 100%);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700">${u.name.charAt(0)}</div>
             </div>
             
             <div id="admin-notifications-dropdown" class="hidden" style="position:absolute;top:48px;right:0;width:340px;background:var(--bg-card);border:1px solid rgba(255,255,255,0.08);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.5);z-index:100;overflow:hidden;text-align:left">

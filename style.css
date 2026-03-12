@@ -171,6 +171,11 @@ input, select, textarea, button {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes metallic-shimmer {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
 .login-logo {
   text-align: center;
   margin-bottom: var(--space-xl);
@@ -395,12 +400,24 @@ input, select, textarea, button {
 .app-header .header-brand {
   font-size: var(--text-sm);
   font-weight: 700;
-  color: var(--text-primary);
   letter-spacing: -0.01em;
+  background: linear-gradient(90deg,
+    #ffffff 0%,
+    #a8d4ff 20%,
+    #ffffff 40%,
+    #d0e8ff 60%,
+    #ffffff 80%,
+    #a8d4ff 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: metallic-shimmer 4s linear infinite;
 }
 
 .app-header .header-brand span {
-  color: var(--accent);
+  color: #4da6ff;
 }
 
 .app-header .header-center {
