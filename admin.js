@@ -222,13 +222,6 @@ const AdminScreens = {
     document.querySelectorAll('[data-remove-vehicle]').forEach(btn => {
       btn.addEventListener('click', (e) => { e.stopPropagation(); this.removeVehicle(btn.dataset.removeVehicle); });
     });
-    // Timesheet Approval - Event Delegation for dynamically rendered buttons
-    document.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-action="approve-timesheet"]');
-      if (btn) {
-        this.approveTimesheet(parseInt(btn.dataset.id));
-      }
-    });
   },
 
   // --- Admin Dashboard ---
@@ -455,7 +448,7 @@ const AdminScreens = {
                 <td><div style="line-height:1.2">${noStr}</div></td>
                 <td><span class="badge badge-${t.status==='approved'?'success':t.status==='active'?'warning':'info'}">${t.status}</span></td>
                 <td>
-                  ${t.status === 'submitted' ? `<button class="btn btn-sm btn-success" data-action="approve-timesheet" data-id="${t.id}" style="padding:4px 8px"><span class="material-icons-round" style="font-size:14px;margin-right:4px">check</span>Approve</button>` : '—'}
+                  ${t.status === 'submitted' ? `<button class="btn btn-sm btn-success" onclick="AdminScreens.approveTimesheet(${t.id})" style="padding:4px 8px"><span class="material-icons-round" style="font-size:14px;margin-right:4px">check</span>Approve</button>` : '—'}
                 </td>
               </tr>`;
             }).join('')}
